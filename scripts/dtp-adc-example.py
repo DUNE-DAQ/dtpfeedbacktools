@@ -1,18 +1,21 @@
 #!/usr/bin/env python
 
+
 import detdataformats
 import detchannelmaps
 import rawdatautils.unpack
 import dtpfeedbacktools
 import rich
-from rich import print as rprint
 import numpy as np
 import pandas as pd
 import collections
 
+from rich import print as rprint
+
 ch_map = detchannelmaps.make_map('HDColdboxChannelMap')
 
-rfr = dtpfeedbacktools.RawFileReader('./raw_record_15285/output_0_3.out')
+adc_path = './raw_record_15285/output_0_0.out'
+rfr = dtpfeedbacktools.RawFileReader(adc_path)
 
 wib_frame_size = 118
 wib_frame_bytes = wib_frame_size*4
@@ -37,3 +40,9 @@ df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]
 df = df.set_index('ts')
 
 rprint(df)
+
+rprint(df.mean())
+rprint(df.std())
+
+import IPython
+IPython.embed(colors="neutral")

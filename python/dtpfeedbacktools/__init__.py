@@ -3,7 +3,7 @@ from ._daq_dtpfeedbacktools_py import *
 
 import ctypes
 
-class RawTPHeader(ctypes.Structure):
+class FWTPHeader(ctypes.Structure):
     _fields_ = [
         ('wire_no', ctypes.c_uint32, 8),
         ('slot_no', ctypes.c_uint32, 3),
@@ -17,7 +17,7 @@ class RawTPHeader(ctypes.Structure):
         ('timestamp_4', ctypes.c_uint32, 16),
     ]
 
-class RawTPData(ctypes.Structure):
+class FWTPData(ctypes.Structure):
     _fields_ = [
         ('end_time', ctypes.c_uint32, 16),
         ('start_time', ctypes.c_uint32, 16),
@@ -27,7 +27,7 @@ class RawTPData(ctypes.Structure):
         ('tp_flags', ctypes.c_uint32, 15),
         ('sum_adc', ctypes.c_uint32, 16),
     ]
-class RawTPTrailer(ctypes.Structure):
+class FWTPTrailer(ctypes.Structure):
     _fields_ = [
         ('accumulator', ctypes.c_int32, 16),
         ('median', ctypes.c_uint32, 16),
