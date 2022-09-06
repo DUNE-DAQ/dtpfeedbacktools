@@ -14,7 +14,7 @@ from rich import print as rprint
 
 ch_map = detchannelmaps.make_map('HDColdboxChannelMap')
 
-adc_path = './raw_record_15285/output_0_0.out'
+adc_path = './data/output_0_0.out'
 rfr = dtpfeedbacktools.RawFileReader(adc_path)
 
 wib_frame_size = 118

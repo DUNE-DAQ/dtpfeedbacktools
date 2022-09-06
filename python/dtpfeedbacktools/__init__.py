@@ -1,6 +1,5 @@
 from ._daq_dtpfeedbacktools_py import *
 
-
 import ctypes
 
 class FWTPHeader(ctypes.Structure):

@@ -20,15 +20,18 @@ rfr = dtpfeedbacktools.RawFileReader(rawtp_path)
 # Some parameters
 tp_block_size = 3
 tp_block_bytes = tp_block_size*4
-# n_tpblocks = 100
+#n_tpblocks = 100
 n_tpblocks = rfr.get_size() // tp_block_bytes
 
 rprint(f"Reading {n_tpblocks} TP blocks")
-blk = rfr.read_block(tp_block_bytes*n_tpblocks)
+blk = rfr.read_block(size=tp_block_bytes*10, offset=(n_tpblocks-10)*tp_block_bytes)
 
+rprint(blk.size())
 
+"""
 rprint(f"Unpacking {n_tpblocks}")
 fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks)
+print(fwtps)
 
 rprint(f"Loaded {len(fwtps)} FW TP packets")
 
@@ -64,5 +67,4 @@ rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
 rprint(rtp_df)
 
-import IPython
-IPython.embed(colors="neutral")
+"""

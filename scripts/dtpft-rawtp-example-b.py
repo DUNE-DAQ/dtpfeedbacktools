@@ -10,7 +10,7 @@ import pandas as pd
 
 from dtpfeedbacktools import FWTPHeader, FWTPData, FWTPTrailer
 
-rawtp_path = './raw_record_15285/output_tp_0_0.out'
+rawtp_path = './data/output_tp_0_0.out'
 
 ch_map = detchannelmaps.make_map('HDColdboxChannelMap')
 
@@ -83,5 +83,3 @@ rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
 
 rprint(rtp_df)
-import IPython
-IPython.embed(colors="neutral")
