@@ -21,17 +21,29 @@ namespace dunedaq
     namespace python
     {
 
-      std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks){
+      std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode=true){
           std::vector<FWTP> fwtps;
 
           FWTPHeader *hdr = static_cast<FWTPHeader *>(buf);
           FWTPTrailer *trl = static_cast<FWTPTrailer *>(buf);
           // FWTPData *hit = static_cast<FWTPData *>(buf);
 
-          size_t i_hdr = 0;
-          size_t i_trl = 0;
-      
-          for (size_t i(0); i<n_blocks; ++i) {
+          size_t i = 0;
+
+          // Search for the first trailer
+          // discarb block before it
+          if (safe_mode) {
+            for ( i=0; i<n_blocks; ++i) {
+              if (trl[i].padding_1 != 0xf00d) {
+                continue;
+              }
+            }
+          }
+
+          // Initialize indexes
+          size_t i_hdr(i), i_trl(i);
+
+          for (; i<n_blocks; ++i) {
 
             if (trl[i].padding_1 != 0xf00d)
             {
