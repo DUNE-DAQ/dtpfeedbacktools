@@ -76,43 +76,34 @@ class RawDataManager:
     def get_link(self, file_name: str):
         return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
         
-    def load_tps(self, file_name: str):
+    def load_tps(self, file_name: str, n_tpblocks: int = -1, offset: int = 0):
         file_path = os.path.join(self.data_path, file_name)
-        rawtp_buf = None
-        rprint(f"Opening {file_name}")
-        with open(file_path, mode="rb") as bindump:
-            rawtp_buf = bindump.read()
 
-        if len(rawtp_buf) == 0:
-            return None
-            
-        n_blocks = len(rawtp_buf) // tp_block_bytes
+        rfr = dtpfeedbacktools.RawFileReader(file_path)
+        total_tpblocks = rfr.get_size() // tp_block_bytes
+        if n_tpblocks == -1:
+            n_tpblocks = total_tpblocks
+        if offset < 0:
+            offset = total_tpblocks + offset
 
-        rawtp_buf_p = ctypes.c_char_p(rawtp_buf)
-        tph_p = ctypes.cast(rawtp_buf_p, ctypes.POINTER(FWTPHeader))
-        tpd_p = ctypes.cast(rawtp_buf_p, ctypes.POINTER(FWTPData))
-        tpt_p = ctypes.cast(rawtp_buf_p, ctypes.POINTER(FWTPTrailer))
+        rprint(f"Reading {n_tpblocks} TP blocks")
+        blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=offset*tp_block_bytes)
 
-        hdr_i = 0
-        trl_i = 0
+        rprint(f"Unpacking {n_tpblocks}")
+        fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks, True)
+
+        rprint(f"Loaded {len(fwtps)} FW TP packets")
 
         fwtp_array = []
 
-        rprint(f"Unpacking {n_blocks} FW TP blocks")
+        for fwtp in fwtps:
+            tph = fwtp.get_header()
+            tpt = fwtp.get_trailer()
 
-        for i in range(n_blocks):
-            if tpt_p[i].m_padding_1 != 0xf00d:
-                continue
-            trl_i = i
-            tph = tph_p[hdr_i]
-            tpt = tpt_p[trl_i]
-    
-            ts = (tph.timestamp_3 << 48) + (tph.timestamp_4 << 32) + (tph.timestamp_1 << 16) + tph.timestamp_2
-
-            for j in range(hdr_i+1, trl_i):
-                tpd = tpd_p[j]
+            for j in range(fwtp.get_n_hits()):
+                tpd = fwtp.get_data(j)
                 fwtp_array.append((
-                    ts,
+                    tph.get_timestamp(),
                     self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(tph.crate_no, tph.slot_no, tph.fiber_no, tph.wire_no),
                     tph.crate_no, 
                     tph.slot_no,
@@ -130,7 +121,6 @@ class RawDataManager:
                     tpd.sum_adc
                 ))
 
-            hdr_i = i+1
         rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 
         rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])

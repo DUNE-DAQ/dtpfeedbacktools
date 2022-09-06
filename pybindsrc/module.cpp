@@ -31,11 +31,12 @@ namespace dunedaq
           size_t i = 0;
 
           // Search for the first trailer
-          // discarb block before it
+          // discard block before it
           if (safe_mode) {
             for ( i=0; i<n_blocks; ++i) {
-              if (trl[i].padding_1 != 0xf00d) {
-                continue;
+              if (trl[i].padding_1 == 0xf00d) {
+                i++;
+                break;
               }
             }
           }

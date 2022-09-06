@@ -11,6 +11,7 @@ from rich import print
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
 
@@ -81,7 +82,7 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
     
     for i, f in enumerate(tp_files):
 
-        rtp_df = rdm.load_tps(f)
+        rtp_df = pd.concat([rdm.load_tps(f, 1000, 0), rdm.load_tps(f, 1000, -1000)])
         file_list.append(f)
         if rtp_df is None:
             continue

@@ -14,7 +14,7 @@ from dtpfeedbacktools import FWTPHeader, FWTPData, FWTPTrailer
 
 ch_map = detchannelmaps.make_map('HDColdboxChannelMap')
 
-rawtp_path = './data/output_tp_0_0.out'
+rawtp_path = './data/raw_record_15285/output_tp_0_0.out'
 rfr = dtpfeedbacktools.RawFileReader(rawtp_path)
 
 # Some parameters
@@ -24,14 +24,12 @@ tp_block_bytes = tp_block_size*4
 n_tpblocks = rfr.get_size() // tp_block_bytes
 
 rprint(f"Reading {n_tpblocks} TP blocks")
-blk = rfr.read_block(size=tp_block_bytes*10, offset=(n_tpblocks-10)*tp_block_bytes)
+blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=0)
 
 rprint(blk.size())
 
-"""
 rprint(f"Unpacking {n_tpblocks}")
-fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks)
-print(fwtps)
+fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks, True)
 
 rprint(f"Loaded {len(fwtps)} FW TP packets")
 
@@ -67,4 +65,3 @@ rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
 rprint(rtp_df)
 
-"""
