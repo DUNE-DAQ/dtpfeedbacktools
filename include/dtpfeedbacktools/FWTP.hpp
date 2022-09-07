@@ -27,16 +27,16 @@ namespace dunedaq
     {
       // This struct contains three words of TP values that form the main repeating
       // pattern in the TP block.
-      uint32_t end_time : 16, start_time : 16;
-      uint32_t peak_time : 16, peak_adc : 16;
-      uint32_t hit_continue : 1, tp_flags : 15, sum_adc : 16;
+      uint16_t end_time, start_time;
+      uint16_t peak_time, peak_adc;
+      uint16_t hit_continue : 1, tp_flags : 15, sum_adc;
     };
 
     struct FWTPTrailer
     {
-      uint32_t accumulator : 16, median : 16;
-      uint32_t padding_1 : 16, padding_2 : 16;
-      uint32_t padding_3 : 16, padding_4 : 16;
+      uint16_t accumulator, median;
+      uint16_t padding_1, padding_2;
+      uint16_t padding_3, padding_4;
     };
 
     class FWTP

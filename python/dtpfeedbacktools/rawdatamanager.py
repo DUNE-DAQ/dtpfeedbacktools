@@ -148,7 +148,7 @@ class RawDataManager:
         
         blk = rfr.read_block(size=wib_frame_bytes*n_frames, offset=offset*wib_frame_bytes)
 
-        wf = detdataformats.wib2.WIB2Frame(blk.get_capsule())
+        wf = detdataformats.wib2.WIB2Frame(blk.as_capsule())
         wh = wf.get_header()
 
         rprint(f"detector {wh.detector_id}, crate: {wh.crate}, slot: {wh.slot}, fibre: {wh.link}")
@@ -157,8 +157,8 @@ class RawDataManager:
 
         off_chans = [self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(wh.crate, wh.slot, wh.link, c) for c in range(256)]
 
-        ts = rawdatautils.unpack.wib2.np_array_timestamp_data(blk.get_capsule(), n_frames)
-        adcs = rawdatautils.unpack.wib2.np_array_adc_data(blk.get_capsule(), n_frames)
+        ts = rawdatautils.unpack.wib2.np_array_timestamp_data(blk.as_capsule(), n_frames)
+        adcs = rawdatautils.unpack.wib2.np_array_adc_data(blk.as_capsule(), n_frames)
 
         rtpc_df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]) for c in range(256)]))
         rtpc_df = rtpc_df.set_index('ts')
