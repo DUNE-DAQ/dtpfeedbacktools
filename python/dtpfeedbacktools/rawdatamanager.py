@@ -66,9 +66,9 @@ class RawDataManager:
     def list_files(self) -> list:
         files = []
         for m in self.match_exprs:
-            files += fnmatch.filter(next(walk(self.data_path), (None, None, []))[2], m)  # [] if no file
+            files += fnmatch.filter([item for item in next(walk(self.data_path), (None, None, []))[2] if os.path.getsize(os.path.join(self.data_path, item)) != 0], m)  # [] if no file
 
-        tpfiles = fnmatch.filter(next(walk(self.data_path), (None, None, []))[2], self.match_tps)
+        tpfiles = fnmatch.filter([item for item in next(walk(self.data_path), (None, None, []))[2] if os.path.getsize(os.path.join(self.data_path, item)) != 0], self.match_tps)
         adcfiles = [file for file in files if file not in tpfiles]
 
         return sorted(tpfiles, reverse=True, key=lambda f: os.path.getmtime(os.path.join(self.data_path, f))), sorted(adcfiles, reverse=True, key=lambda f: os.path.getmtime(os.path.join(self.data_path, f)))
@@ -80,6 +80,9 @@ class RawDataManager:
         file_path = os.path.join(self.data_path, file_name)
 
         rfr = dtpfeedbacktools.RawFileReader(file_path)
+        #if rfr.get_size() == 0:
+        #    return None
+
         total_tpblocks = rfr.get_size() // tp_block_bytes
         if n_tpblocks == -1:
             n_tpblocks = total_tpblocks
@@ -127,18 +130,23 @@ class RawDataManager:
 
         return rtp_df
 
-    def load_tpcs(self, file_name: str):
+    def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
         
         file_path = os.path.join(self.data_path, file_name)
         rprint(f"Opening {file_name}")
         rfr = dtpfeedbacktools.RawFileReader(file_path)
 
-        n_frames = rfr.get_size() // wib_frame_bytes
+        total_frames = rfr.get_size() // wib_frame_bytes
 
-        if rfr.get_size() == 0:
-            return None
+        #if rfr.get_size() == 0:
+        #    return None
+
+        if n_frames == -1:
+            n_frames = total_frames
+        if offset < 0:
+            offset = total_frames + offset
         
-        blk = rfr.read_block(wib_frame_bytes*n_frames)
+        blk = rfr.read_block(size=wib_frame_bytes*n_frames, offset=offset*wib_frame_bytes)
 
         wf = detdataformats.wib2.WIB2Frame(blk.get_capsule())
         wh = wf.get_header()

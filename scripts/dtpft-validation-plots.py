@@ -83,9 +83,8 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
     for i, f in enumerate(tp_files):
 
         rtp_df = pd.concat([rdm.load_tps(f, 1000, 0), rdm.load_tps(f, 1000, -1000)])
+        #rrtp_df = dm.load_tps(f, -1, 0)
         file_list.append(f)
-        if rtp_df is None:
-            continue
         #rich.print(rtp_df)
 
         if plots:
@@ -108,10 +107,9 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
 
     for i, f in enumerate(adc_files):
 
-        rtpc_df = rdm.load_tpcs(f)
+        rtpc_df = pd.concat([rdm.load_tpcs(f, 1000, 0), rdm.load_tpcs(f, 1000, -1000)])
+        #rtpc_df = rdm.load_tpcs(f, -1, 0)
         file_list.append(f)
-        if rtpc_df is None:
-            continue
         #rich.print(rtpc_df)
 
         link = rdm.get_link(f)
