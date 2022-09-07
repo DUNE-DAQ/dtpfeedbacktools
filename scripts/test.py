@@ -30,7 +30,7 @@ rprint(blk.size())
 
 """
 rprint(f"Unpacking {n_tpblocks}")
-fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks)
+fwtps = dtpfeedbacktools.unpack_fwtps(blk.as_capsule(), n_tpblocks)
 print(fwtps)
 
 rprint(f"Loaded {len(fwtps)} FW TP packets")
