@@ -198,8 +198,8 @@ class RawDataManager:
             offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 100, ts_low)
             offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 100, ts_high)
 
-        rich.print(ts_first_low, ts_first_high)
-        return offset_low, offset_high
+        #rich.print(ts_first_low, ts_last_high)
+        return offset_low, offset_high+sample_bytes
 
     def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
         
