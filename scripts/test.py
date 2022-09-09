@@ -29,12 +29,8 @@ blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=0)
 rprint(blk.size())
 
 rprint(f"Unpacking {n_tpblocks}")
-<<<<<<< HEAD
-fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks, True)
-=======
 fwtps = dtpfeedbacktools.unpack_fwtps(blk.as_capsule(), n_tpblocks)
 print(fwtps)
->>>>>>> 93272fb0c0ab083e025b6b21bcafd73a0581ca85
 
 rprint(f"Loaded {len(fwtps)} FW TP packets")
 

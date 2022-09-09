@@ -75,28 +75,8 @@ class RawDataManager:
 
     def get_link(self, file_name: str):
         return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
-        
-    def load_tps(self, file_name: str, n_tpblocks: int = -1, offset: int = 0):
-        file_path = os.path.join(self.data_path, file_name)
-
-        rfr = dtpfeedbacktools.RawFileReader(file_path)
-        #if rfr.get_size() == 0:
-        #    return None
-
-        total_tpblocks = rfr.get_size() // tp_block_bytes
-        if n_tpblocks == -1:
-            n_tpblocks = total_tpblocks
-        if offset < 0:
-            offset = total_tpblocks + offset
-
-        rprint(f"Reading {n_tpblocks} TP blocks")
-        blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=offset*tp_block_bytes)
-
-        rprint(f"Unpacking {n_tpblocks}")
-        fwtps = dtpfeedbacktools.unpack_fwtps(blk.get_capsule(), n_tpblocks, True)
-
-        rprint(f"Loaded {len(fwtps)} FW TP packets")
-
+    
+    def fwtp_list_to_df(self, fwtps: list):
         fwtp_array = []
 
         for fwtp in fwtps:
@@ -123,12 +103,103 @@ class RawDataManager:
                     tpd.tp_flags,
                     tpd.sum_adc
                 ))
-
         rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 
         rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
 
         return rtp_df
+
+    def load_tps(self, file_name: str, n_tpblocks: int = -1, offset: int = 0):
+        file_path = os.path.join(self.data_path, file_name)
+
+        rfr = dtpfeedbacktools.RawFileReader(file_path)
+        #if rfr.get_size() == 0:
+        #    return None
+
+        total_tpblocks = rfr.get_size() // tp_block_bytes
+        if n_tpblocks == -1:
+            n_tpblocks = total_tpblocks
+        if offset < 0:
+            offset = total_tpblocks + offset
+
+        rprint(f"Reading {n_tpblocks} TP blocks")
+        blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=offset*tp_block_bytes)
+
+        rprint(f"Unpacking {n_tpblocks}")
+        fwtps = dtpfeedbacktools.unpack_fwtps(blk.as_capsule(), n_tpblocks, True)
+
+        rprint(f"Loaded {len(fwtps)} FW TP packets")
+
+        rtp_df = self.fwtp_list_to_df(fwtps)
+
+        return rtp_df
+
+    def find_tp_ts_minmax(self, file_name: str, rfr = None) -> list:
+        if rfr == None:
+            file_path = os.path.join(self.data_path, file_name)
+            rfr = dtpfeedbacktools.RawFileReader(file_path)
+        
+        max_tpblocks = rfr.get_size() // tp_block_bytes
+        max_bytes = max_tpblocks * tp_block_bytes
+
+        n_tpblocks = 32
+        n_bytes = tp_block_bytes*n_tpblocks
+        first_blk = rfr.read_block(n_bytes)
+        last_blk = rfr.read_block(n_bytes, max_bytes-n_bytes)
+
+        first_fwtps = dtpfeedbacktools.unpack_fwtps(first_blk.as_capsule(), n_tpblocks, False)
+        last_fwtps = dtpfeedbacktools.unpack_fwtps(last_blk.as_capsule(), n_tpblocks)
+
+        first_rtp_df = self.fwtp_list_to_df(first_fwtps)
+        last_rtp_df = self.fwtp_list_to_df(last_fwtps)
+
+        #rprint(f"read {len(first_rtp_df)} FWTPs at the start of file: min ts = {first_rtp_df['ts'].min()}")
+        #rprint(f"read {len(last_rtp_df)} FWTPs at the end of file: max ts = {first_rtp_df['ts'].max()}")
+
+        return first_rtp_df['ts'].min(), last_rtp_df['ts'].max()
+
+    def linear_search(self, rfr, min_bytes: int, max_bytes: int, samples: int, ts_target: int):
+        sample_bytes = (max_bytes-min_bytes)//samples
+        n_tpblocks = 32
+        n_bytes = tp_block_bytes*n_tpblocks
+
+        for i in range(samples):
+            offset = min_bytes+sample_bytes*i
+            first_blk = rfr.read_block(n_bytes, offset)
+            last_blk = rfr.read_block(n_bytes, offset+sample_bytes)
+
+            first_fwtps = dtpfeedbacktools.unpack_fwtps(first_blk.as_capsule(), n_tpblocks, False)
+            last_fwtps = dtpfeedbacktools.unpack_fwtps(last_blk.as_capsule(), n_tpblocks)
+
+            first_rtp_df = self.fwtp_list_to_df(first_fwtps)
+            last_rtp_df = self.fwtp_list_to_df(last_fwtps)
+            
+            ts_first = first_rtp_df['ts'].min()
+            ts_last = last_rtp_df['ts'].max()
+
+            if((ts_first <= ts_target)&(ts_last >= ts_target)):
+                return offset, ts_first, ts_last
+            else:
+                continue
+
+    def linear_search_tp(self, file_name: str, ts_low: int, ts_high: int, n_idle: int = 2):
+        file_path = os.path.join(self.data_path, file_name)
+        rfr = dtpfeedbacktools.RawFileReader(file_path)
+
+        max_tpblocks = rfr.get_size() // tp_block_bytes
+        max_bytes = max_tpblocks * tp_block_bytes
+        min_bytes = 0
+
+        offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, min_bytes, max_bytes, 100, ts_low)
+        offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, min_bytes, max_bytes, 100, ts_high)
+
+        for i in range(n_idle - 1):
+            sample_bytes = (max_bytes-min_bytes)//100
+            offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 100, ts_low)
+            offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 100, ts_high)
+
+        rich.print(ts_first_low, ts_first_high)
+        return offset_low, offset_high
 
     def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
         
@@ -136,15 +207,15 @@ class RawDataManager:
         rprint(f"Opening {file_name}")
         rfr = dtpfeedbacktools.RawFileReader(file_path)
 
-        total_frames = rfr.get_size() // wib_frame_bytes
+        max_frames = rfr.get_size() // wib_frame_bytes
 
         #if rfr.get_size() == 0:
         #    return None
 
         if n_frames == -1:
-            n_frames = total_frames
+            n_frames = max_frames
         if offset < 0:
-            offset = total_frames + offset
+            offset = max_frames + offset
         
         blk = rfr.read_block(size=wib_frame_bytes*n_frames, offset=offset*wib_frame_bytes)
 
@@ -164,3 +235,20 @@ class RawDataManager:
         rtpc_df = rtpc_df.set_index('ts')
         
         return rtpc_df
+
+    def find_tpc_ts_minmax(self, file_name: str) -> list:
+        file_path = os.path.join(self.data_path, file_name)
+        rfr = dtpfeedbacktools.RawFileReader(file_path)
+
+        max_frames = rfr.get_size() // wib_frame_bytes
+        max_bytes = max_frames * wib_frame_bytes
+
+        n_frames = 1
+        n_bytes = wib_frame_bytes*n_frames
+        first_blk = rfr.read_block(n_bytes)
+        last_blk = rfr.read_block(n_bytes, max_bytes-n_bytes)
+
+        first_ts = rawdatautils.unpack.wib2.np_array_timestamp_data(first_blk.as_capsule(), n_frames)
+        last_ts = rawdatautils.unpack.wib2.np_array_timestamp_data(last_blk.as_capsule(), n_frames)
+        
+        return first_ts, last_ts

@@ -4,7 +4,6 @@ from dtpfeedbacktools.rawdatamanager import RawDataManager
 import sys
 import rich
 from rich.table import Table
-from rich.console import Console
 import logging
 import click
 from rich import print
@@ -72,8 +71,6 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
     t.add_column("capture length (timestamp ticks)")
     t.add_column("capture length (s)")
     t.add_column("overlap (s)")
-
-    console = Console()
     
     tstamps = -np.ones((len(tp_files)+len(adc_files), 2), dtype=int)
     links = -np.ones(len(tp_files)+len(adc_files), dtype=int)
@@ -82,8 +79,8 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
     
     for i, f in enumerate(tp_files):
 
-        rtp_df = pd.concat([rdm.load_tps(f, 1000, 0), rdm.load_tps(f, 1000, -1000)])
-        #rrtp_df = dm.load_tps(f, -1, 0)
+        #rtp_df = pd.concat([rdm.load_tps(f, 1000, 0), rdm.load_tps(f, 1000, -1000)])
+        rtp_df = rdm.load_tps(f, -1, 0)
         file_list.append(f)
         #rich.print(rtp_df)
 
@@ -107,8 +104,8 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
 
     for i, f in enumerate(adc_files):
 
-        rtpc_df = pd.concat([rdm.load_tpcs(f, 1000, 0), rdm.load_tpcs(f, 1000, -1000)])
-        #rtpc_df = rdm.load_tpcs(f, -1, 0)
+        #rtpc_df = pd.concat([rdm.load_tpcs(f, 1000, 0), rdm.load_tpcs(f, 1000, -1000)])
+        rtpc_df = rdm.load_tpcs(f, -1, 0)
         file_list.append(f)
         #rich.print(rtpc_df)
 
@@ -139,29 +136,27 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outpath: s
             
     print(t)
 
-    """
-    if plots:
-        file_order = [int(s) for s in txt.split() for txt in tp_files+adc_files  if s.isdigit()]
-        
+
+    if plots:  
         fig=plt.figure(figsize=(9,7))
 
-        label = "TP capture"
-        for i in range(len(tp_list)):
-            plt.fill_between((tp_tstamps[i]-tp_tstamps[i,0])*NS_PER_TICK*1e-9, [4.75+i*6, 4.75+i*6], [5.25+i*6, 5.25+i*6], color="dodgerblue", alpha=0.6, label=label)
-            label = "_nolegend_"
+        tp_label = "TP capture"
+        adc_label = "ADC capture"
+        for i in range(len(tstamps)):
+            if(links[i] in [5, 11]):
+                plt.fill_between((tstamps[i]-tstamp_reference)*NS_PER_TICK*1e-9, [links[i]-.25, links[i]-.25], [links[i]+.25, links[i]+.25], color="dodgerblue", alpha=0.6, label=tp_label)
+                tp_label = "_nolegend_"
+            else:
+                plt.fill_between((tstamps[i]-tstamp_reference)*NS_PER_TICK*1e-9, [links[i]-.25, links[i]-.25], [links[i]+.25, links[i]+.25], color="red", alpha=0.6, label=adc_label)
+                adc_label = "_nolegend_"
 
-        label = "ADC capture"
-        for j in range(len(adc_list)):
-            plt.fill_between((adc_tstamps[j]-tp_tstamps[int(adc_assn[j] > 5),0])*16*1e-9, [-0.25+adc_assn[j], -0.25+adc_assn[j]], [0.25+adc_assn[j], 0.25+adc_assn[j]],  color="red", alpha=0.6, label=label)
-            label = "_nolegend_"
-        
         plt.legend(fontsize=14, loc="lower left")
 
         plt.xlabel("Time [s]", labelpad=10, fontsize=16)
         plt.ylabel("Link", labelpad=10, fontsize=16)
     
-        plt.savefig("./time_overlap.pdf", dpi=500, bbox_inches='tight')
-    """
+        plt.savefig(outpath+"time_overlap.pdf", dpi=500, bbox_inches='tight')
+
     
     if interactive:
         import IPython

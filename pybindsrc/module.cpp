@@ -41,13 +41,6 @@ namespace dunedaq
 
           // Search for the first trailer
           // discard block before it
-<<<<<<< HEAD
-          if (safe_mode) {
-            for ( i=0; i<n_blocks; ++i) {
-              if (trl[i].padding_1 == 0xf00d) {
-                i++;
-                break;
-=======
 
             // Work in bytes
             auto buf_u8 = static_cast<uint8_t*>(buf);
@@ -69,7 +62,6 @@ namespace dunedaq
 
               if (offset_pad1 < offset_of(&FWTPTrailer::padding_1)) {
                 continue;
->>>>>>> 93272fb0c0ab083e025b6b21bcafd73a0581ca85
               }
 
               break;
@@ -114,7 +106,7 @@ namespace dunedaq
 
             int64_t n_hits = ((int64_t)i_trl-((int64_t)i_hdr+1));
             if (  n_hits < 1 ) {
-              std::cout << "Block " << i << " -> " << n_hits << " ~ " <<i_trl << " " << i_hdr << std::endl;
+              //std::cout << "Block " << i << " -> " << n_hits << " ~ " <<i_trl << " " << i_hdr << std::endl;
             } else {
               fwtps.push_back(FWTP((void*)(hdr+i_hdr), i_trl-(i_hdr+1)));
             }
