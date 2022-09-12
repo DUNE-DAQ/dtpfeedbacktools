@@ -73,6 +73,9 @@ class RawDataManager:
 
         return sorted(tpfiles, reverse=True, key=lambda f: os.path.getmtime(os.path.join(self.data_path, f))), sorted(adcfiles, reverse=True, key=lambda f: os.path.getmtime(os.path.join(self.data_path, f)))
 
+    def get_run(self):
+        return [int(s) for s in self.data_path.split("_") if s.isdigit()][0]
+
     def get_link(self, file_name: str):
         return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
     
@@ -103,7 +106,7 @@ class RawDataManager:
                     tpd.tp_flags,
                     tpd.sum_adc
                 ))
-        rprint(f"Unpacked {len(fwtp_array)} FW TPs")
+        #rprint(f"Unpacked {len(fwtp_array)} FW TPs")
 
         rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
 
@@ -195,11 +198,11 @@ class RawDataManager:
 
         for i in range(n_idle - 1):
             sample_bytes = (max_bytes-min_bytes)//100
-            offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 100, ts_low)
-            offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 100, ts_high)
+            offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 1000, ts_low)
+            offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 1000, ts_high)
 
         #rich.print(ts_first_low, ts_last_high)
-        return offset_low, offset_high+sample_bytes
+        return offset_low, offset_high
 
     def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
         

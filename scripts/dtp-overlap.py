@@ -40,9 +40,10 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "VST"
     ]),
               help="Select input channel map", default=None)
-@click.option('-o', '--out_path', default="./validation")
+@click.option('-n', '--n_plots', help="Select number of plots in output file", default=10)
+@click.option('-o', '--out_path', help="Output path for plots", default="./validation")
 
-def cli(interactive: bool, files_path: str, map_id: str, out_path: str) -> None:
+def cli(interactive: bool, files_path: str, map_id: str, n_plots: int, out_path: str) -> None:
 
     rdm = RawDataManager(files_path, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
@@ -97,19 +98,21 @@ def cli(interactive: bool, files_path: str, map_id: str, out_path: str) -> None:
     rich.print(rtp_df)
     rtpc_df = rdm.load_tpcs(boundaries[0])
 
+    plot_offset = len(rtp_df)//2
+
     n = 0
     pdf = matplotlib.backends.backend_pdf.PdfPages(out_path)
     for i in range(1000):
-        if(n >= 10): break
+        if(n >= n_plots): break
 
-        tstamp = rtp_df["ts"][6666+i]
-        channel = rtp_df["offline_ch"][6666+i]
-        time_start = rtp_df["start_time"][6666+i]
-        time_end = rtp_df["end_time"][6666+i]
-        time_peak = rtp_df["peak_time"][6666+i]
+        tstamp = rtp_df["ts"][plot_offset+i]
+        channel = rtp_df["offline_ch"][plot_offset+i]
+        time_start = rtp_df["start_time"][plot_offset+i]
+        time_end = rtp_df["end_time"][plot_offset+i]
+        time_peak = rtp_df["peak_time"][plot_offset+i]
         time_over_threshold = time_end - time_start
-        adc_peak = rtp_df["peak_adc"][6666+i]
-        fw_median = rtp_df["median"][6666+i]
+        adc_peak = rtp_df["peak_adc"][plot_offset+i]
+        fw_median = rtp_df["median"][plot_offset+i]
         if(adc_peak < 120): continue
 
         mu = rtpc_df[channel].mean()
@@ -124,10 +127,10 @@ def cli(interactive: bool, files_path: str, map_id: str, out_path: str) -> None:
             f'{"mean = ":<18}{round(mu,2):>3}',
             f'{"std = ":<20}{round(sigma,2):>3}',
             f'{"peak adc = ":<22}{adc_peak:>3}',
-            f'{"time over threshold = ":<22}{time_over_threshold:>3}'))
+            f'{"time over threshold = ":<22}{time_over_threshold*32:>3}'))
 
         record_info = '\n'.join((
-            f'{"run number = ":<17}{15310:>10}',
+            f'{"run number = ":<17}{rdm.get_run():>10}',
             f'{"channel = ":<17}{channel:>10}',
             f'{"tstamp = ":<9}{tstamp:>10}'))
 
