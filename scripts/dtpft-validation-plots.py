@@ -57,7 +57,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 def cli(interactive: bool, n_lines: int, files_path: str, map_id: str, outpath: str) -> None:
 
-    rdm = RawDataManager(files_path, map_id)
+    rdm = RawDataManager(files_path, ch_map_id=map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
     n_blocks = n_lines//3
