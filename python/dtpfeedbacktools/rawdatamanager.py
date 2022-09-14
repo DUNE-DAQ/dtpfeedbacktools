@@ -7,7 +7,8 @@ import ctypes
 
 import detdataformats
 import detchannelmaps
-import rawdatautils.unpack
+import rawdatautils.unpack.wib as protowib_unpack
+import rawdatautils.unpack.wib2 as wib_unpack
 import dtpfeedbacktools
 from dtpfeedbacktools import FWTPHeader, FWTPData, FWTPTrailer
 
@@ -23,6 +24,18 @@ tp_block_bytes = tp_block_size*4
 wib_frame_size = 118
 wib_frame_bytes = wib_frame_size*4
 
+def get_protowib_header_info( blk ):
+        wf = detdataformats.wib.WIBFrame(blk.as_capsule())
+        wh = wf.get_wib_header()
+
+        return (0, wh.crate_no, wh.slot_no, wh.fiber_no)
+
+def get_wib_header_info( blk ):
+    wf = detdataformats.wib2.WIB2Frame(blk.as_capsule())
+    wh = wf.get_header()
+
+    return (wh.detector_id, wh.crate, wh.slot, wh.link)
+
 class VSTChannelMap(object):
 
     @staticmethod
@@ -37,6 +50,10 @@ class RawDataManager:
     
     match_exprs = ['*.out']
     match_tps = '*_tp_*'
+    frametype_map = {
+        'ProtoWIB': (get_protowib_header_info, protowib_unpack),
+        'WIB': (get_wib_header_info, wib_unpack),
+    }
     
     @staticmethod 
     def make_channel_map(map_id):
@@ -54,14 +71,16 @@ class RawDataManager:
         else:
             raise RuntimeError(f"Unknown channel map id '{map_id}'")
 
-    def __init__(self, data_path: str, ch_map_id: str = 'HDColdbox') -> None:
+    def __init__(self, data_path: str, frame_type: str = 'WIB', ch_map_id: str = 'HDColdbox') -> None:
 
         if not os.path.isdir(data_path):
             raise ValueError(f"Directory {data_path} does not exist")
 
         self.data_path = data_path
         self.ch_map_name = ch_map_id
-        self.ch_map = self.make_channel_map(ch_map_id) 
+        self.ch_map = self.make_channel_map(ch_map_id)
+
+        self.get_hdr_info, self.blk_unpack = self.frametype_map[frame_type]
 
     def list_files(self) -> list:
         files = []
@@ -222,17 +241,13 @@ class RawDataManager:
         
         blk = rfr.read_block(size=wib_frame_bytes*n_frames, offset=offset*wib_frame_bytes)
 
-        wf = detdataformats.wib2.WIB2Frame(blk.as_capsule())
-        wh = wf.get_header()
+        hdr_info = self.get_hdr_info(blk)
+        rprint(f"detector {hdr_info[0]}, crate: {hdr_info[1]}, slot: {hdr_info[2]}, fibre: {hdr_info[3]}")
 
-        rprint(f"detector {wh.detector_id}, crate: {wh.crate}, slot: {wh.slot}, fibre: {wh.link}")
+        off_chans = [self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(hdr_info[1], hdr_info[2], hdr_info[3], c) for c in range(256)]
 
-        hdr_info = (wh.detector_id, wh.crate, wh.slot, wh.link)
-
-        off_chans = [self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(wh.crate, wh.slot, wh.link, c) for c in range(256)]
-
-        ts = rawdatautils.unpack.wib2.np_array_timestamp_data(blk.as_capsule(), n_frames)
-        adcs = rawdatautils.unpack.wib2.np_array_adc_data(blk.as_capsule(), n_frames)
+        ts = self.blk_unpack.np_array_timestamp_data(blk.as_capsule(), n_frames)
+        adcs = self.blk_unpack.np_array_adc_data(blk.as_capsule(), n_frames)
 
         rtpc_df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]) for c in range(256)]))
         rtpc_df = rtpc_df.set_index('ts')
@@ -251,7 +266,7 @@ class RawDataManager:
         first_blk = rfr.read_block(n_bytes)
         last_blk = rfr.read_block(n_bytes, max_bytes-n_bytes)
 
-        first_ts = rawdatautils.unpack.wib2.np_array_timestamp_data(first_blk.as_capsule(), n_frames)
-        last_ts = rawdatautils.unpack.wib2.np_array_timestamp_data(last_blk.as_capsule(), n_frames)
+        first_ts = self.blk_unpack.np_array_timestamp_data(first_blk.as_capsule(), n_frames)
+        last_ts = self.blk_unpack.np_array_timestamp_data(last_blk.as_capsule(), n_frames)
         
         return first_ts, last_ts

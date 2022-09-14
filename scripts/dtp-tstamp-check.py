@@ -21,19 +21,6 @@ all_plots = {"header":header, "hit":hit, "pedinfo":pedinfo}
 
 NS_PER_TICK = 16
 
-def validation_hist(rtp_df, var):
-    xmin = np.min(rtp_df[var])-.5
-    xmax = np.max(rtp_df[var])+.5
-    fig = plt.figure()
-    plt.hist(rtp_df[var], histtype='step', bins=np.linspace(xmin, xmax, int(xmax-xmin+1)))
-    plt.title(var)
-    plt.yscale("log")
-    plt.xlim(xmin-1, xmax+1)
-    plt.xlabel(var)
-    plt.ylabel("# hit packets")
-    plt.grid()
-    return fig
-
 def overlap_check(tp_tstamp, adc_tstamp):
     overlap_true = (adc_tstamp[0] <= tp_tstamp[1])&(adc_tstamp[1] >= tp_tstamp[0])
     overlap_time = max(0, min(tp_tstamp[1], adc_tstamp[1]) - max(tp_tstamp[0], adc_tstamp[0]))
@@ -52,12 +39,18 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "PD2HD",
         "VST"
     ]),
-              help="Select input channel map", default=None)
+              help="Select input channel map", default="HDColdbox")
+@click.option('-f', '--frame_type', type=click.Choice(
+    [
+        "ProtoWIB",
+        "WIB"
+    ]),
+              help="Select input frame type", default="WIB")
 @click.option('-o', '--outname', default="./tstamp.png")
 
-def cli(interactive: bool, plots: bool, files_path: str, map_id: str, outname: str) -> None:
+def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type: str, outname: str) -> None:
 
-    rdm = RawDataManager(files_path, map_id)
+    rdm = RawDataManager(files_path, frame_type, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
     rich.print(tp_files)

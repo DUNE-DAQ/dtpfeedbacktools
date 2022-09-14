@@ -17,6 +17,10 @@ import matplotlib.backends.backend_pdf
 tp_block_size = 3
 tp_block_bytes = tp_block_size*4
 
+#fir_coefficients = [0,0,0,0,0,0,0,0,2,4,6,7,9,11,12,13,13,12,11,9,7,6,4,2,0,0,0,0,0,0,0,0]
+#fir_correction = 64/np.linalg.norm(fir_coefficients)
+fir_correction = 1
+
 NS_PER_TICK = 16
 
 def overlap_check(tp_tstamp, adc_tstamp):
@@ -40,12 +44,19 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "VST"
     ]),
               help="Select input channel map", default=None)
+@click.option('-f', '--frame_type', type=click.Choice(
+    [
+        "ProtoWIB",
+        "WIB"
+    ]),
+              help="Select input frame type", default="WIB")
 @click.option('-n', '--n_plots', help="Select number of plots in output file", default=10)
+@click.option('-t', '--threshold', help="Select hit threshold used", default=100)
 @click.option('-o', '--out_path', help="Output path for plots", default="./validation")
 
-def cli(interactive: bool, files_path: str, map_id: str, n_plots: int, out_path: str) -> None:
+def cli(interactive: bool, files_path: str, map_id: str, frame_type: str, n_plots: int, threshold: int, out_path: str) -> None:
 
-    rdm = RawDataManager(files_path, map_id)
+    rdm = RawDataManager(files_path, frame_type, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
     rich.print(tp_files)
@@ -98,6 +109,9 @@ def cli(interactive: bool, files_path: str, map_id: str, n_plots: int, out_path:
     rich.print(rtp_df)
     rtpc_df = rdm.load_tpcs(boundaries[0])
 
+    rtp_df.to_hdf("rtp.hdf5", key="rtp")
+    #rtpc_df.to_hdf("rtpc.hdf5", key="rtp")
+
     plot_offset = len(rtp_df)//2
 
     n = 0
@@ -147,7 +161,7 @@ def cli(interactive: bool, files_path: str, map_id: str, n_plots: int, out_path:
         plt.axvline(x=time_peak*32, linestyle="--", c="k", alpha=0.3)
         plt.axvline(x=(time_peak-15)*32, linestyle="--", c="k", alpha=0.6)
         ax.hlines(y=fw_median, xmin=0, xmax=2048, linestyle="-.", colors="black", alpha=0.5, label="median")
-        ax.hlines(y=fw_median+100, xmin=0, xmax=2048, linestyle="-.", colors="limegreen", alpha=0.5, label="median+threshold")
+        ax.hlines(y=fw_median+threshold*fir_correction, xmin=0, xmax=2048, linestyle="-.", colors="limegreen", alpha=0.5, label="median+threshold")
         ax.text(0.035, 0.95, wave_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props, fontdict=mono)
         ax.text(0.60, 0.175, record_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props, fontdict=mono)
         plt.ylim(median-300, median+300)
