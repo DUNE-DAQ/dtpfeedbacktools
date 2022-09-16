@@ -60,12 +60,15 @@ def cli(interactive: bool, n_lines: int, files_path: str, map_id: str, outpath: 
     rdm = RawDataManager(files_path, ch_map_id=map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
-    n_blocks = n_lines//3
+    if (n_lines == -1):
+        n_blocks = -1
+    else:
+        n_blocks = n_lines//3
 
     rich.print(tp_files)
     
     for i, f in enumerate(tp_files):
-        rtp_df = rdm.load_tps(f, n_tps, 0)
+        rtp_df = rdm.load_tps(f, n_blocks, 0)
         for set in all_plots:
             outname = outpath+f.replace(".out", "_"+set+".pdf")
             pdf = matplotlib.backends.backend_pdf.PdfPages(outname)
