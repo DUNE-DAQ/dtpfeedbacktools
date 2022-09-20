@@ -96,7 +96,8 @@ class RawDataManager:
         return [int(s) for s in self.data_path.split("_") if s.isdigit()][0]
 
     def get_link(self, file_name: str):
-        return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
+        #return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
+        return int(file_name.replace(".out", "").split("_")[-1])
     
     def fwtp_list_to_df(self, fwtps: list):
         fwtp_array = []
