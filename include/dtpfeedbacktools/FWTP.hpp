@@ -34,7 +34,8 @@ namespace dunedaq
 
     struct FWTPTrailer
     {
-      uint16_t accumulator, median;
+      int16_t  accumulator;
+      uint16_t median;
       uint16_t padding_1, padding_2;
       uint16_t padding_3, padding_4;
     };

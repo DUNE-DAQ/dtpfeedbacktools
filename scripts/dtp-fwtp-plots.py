@@ -163,6 +163,7 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             time_over_threshold = time_end - time_start
             adc_peak = rtp_df["peak_adc"][plot_offset+i]
             fw_median = rtp_df["median"][plot_offset+i]
+            accumulator = rtp_df["accumulator"][plot_offset+i]
             if(adc_peak < 120): continue
 
             mu = rtpc_df[channel].mean()
@@ -174,10 +175,14 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             time = adc_data.index.astype(int) - tstamp
 
             wave_info = '\n'.join((
-                f'{"mean = ":<18}{round(mu,2):>3}',
-                f'{"std = ":<20}{round(sigma,2):>3}',
-                f'{"peak adc = ":<22}{adc_peak:>3}',
-                f'{"time over threshold = ":<22}{time_over_threshold*32:>3}'))
+                f'{"mean = ":<7}{round(mu,2):>6}',
+                f'{"std = ":<7}{round(sigma,2):>6}'))
+
+            tp_info = '\n'.join((
+                f'{"median = ":<14}{fw_median:>4}',
+                f'{"accumulator = ":<14}{accumulator:>4}',
+                f'{"peak adc = ":<14}{adc_peak:>4}',
+                f'{"tot [tt] = ":<14}{time_over_threshold:>4}'))
 
             record_info = '\n'.join((
                 f'{"run number = ":<17}{rdm.get_run():>10}',
@@ -187,7 +192,9 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             fig = plt.figure()
             plt.style.use('ggplot')
             ax = fig.add_subplot(111)
-            props = dict(boxstyle='square', facecolor='white', alpha=0.8)
+            props_record = dict(boxstyle='square', facecolor='white', alpha=0.8)
+            props_tp = dict(boxstyle='square', facecolor='red', alpha=0.3)
+            props_wave = dict(boxstyle='square', facecolor='dodgerblue', alpha=0.3)
             mono = {'family' : 'monospace'}
             plt.plot(time, adc, c="dodgerblue", label="Raw ADC")
             for i in range(4):
@@ -198,8 +205,9 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             plt.axvline(x=(time_peak-15)*32, linestyle="--", c="k", alpha=0.6)
             ax.hlines(y=fw_median, xmin=0, xmax=2048, linestyle="-.", colors="black", alpha=0.5, label="median")
             ax.hlines(y=fw_median+threshold*fir_correction, xmin=0, xmax=2048, linestyle="-.", colors="limegreen", alpha=0.5, label="median+threshold")
-            ax.text(0.035, 0.95, wave_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props, fontdict=mono)
-            ax.text(0.60, 0.175, record_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props, fontdict=mono)
+            ax.text(0.035, 0.95, wave_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_wave, fontdict=mono)
+            ax.text(0.035, 0.175, tp_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_tp, fontdict=mono)
+            ax.text(0.60, 0.175, record_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_record, fontdict=mono)
             plt.ylim(median-300, median+300)
             plt.xlabel("Relative time [ticks]", fontsize=12, labelpad=10, loc="right")
             legend = plt.legend(fontsize=8, loc="upper right")

@@ -256,7 +256,7 @@ namespace dunedaq
             ;
 
         py::class_<FWTPTrailer>(m, "FWTPTrailer")
-            .def_property_readonly("accumulator", [](FWTPTrailer &self) -> uint32_t { return self.accumulator; })
+            .def_property_readonly("accumulator", [](FWTPTrailer &self) -> int32_t { return self.accumulator; })
             .def_property_readonly("median", [](FWTPTrailer &self) -> uint32_t { return self.median; })
             .def_property_readonly("padding_1", [](FWTPTrailer &self) -> uint32_t { return self.padding_1; })
             .def_property_readonly("padding_2", [](FWTPTrailer &self) -> uint32_t { return self.padding_2; })
