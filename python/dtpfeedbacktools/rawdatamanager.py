@@ -145,6 +145,9 @@ class RawDataManager:
         if offset < 0:
             offset = total_tpblocks + offset
 
+        #rprint(f"Number of blocks to read {n_tpblocks}")
+        #rprint(f"Offset {offset}")
+
         rprint(f"Reading {n_tpblocks} TP blocks")
         blk = rfr.read_block(size=tp_block_bytes*n_tpblocks, offset=offset*tp_block_bytes)
 
@@ -186,6 +189,9 @@ class RawDataManager:
         n_tpblocks = 32
         n_bytes = tp_block_bytes*n_tpblocks
 
+        ts_first_old = 0
+        ts_last_old = 0
+
         for i in range(samples):
             offset = min_bytes+sample_bytes*i
             first_blk = rfr.read_block(n_bytes, offset)
@@ -202,8 +208,11 @@ class RawDataManager:
 
             if((ts_first <= ts_target)&(ts_last >= ts_target)):
                 return offset, ts_first, ts_last
+            elif((ts_last_old <= ts_target)&(ts_first >= ts_target)):
+                return offset-sample_bytes, ts_last_old, ts_first
             else:
-                continue
+                ts_first_old = ts_first
+                ts_last_old = ts_last
 
     def linear_search_tp(self, file_name: str, ts_low: int, ts_high: int, n_idle: int = 2):
         file_path = os.path.join(self.data_path, file_name)
@@ -218,10 +227,12 @@ class RawDataManager:
 
         for i in range(n_idle - 1):
             sample_bytes = (max_bytes-min_bytes)//100
-            offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 1000, ts_low)
-            offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 1000, ts_high)
+            offset_low, ts_first_low, ts_last_low = self.linear_search(rfr, offset_low, offset_low+sample_bytes, 100, ts_low)
+            offset_high, ts_first_high, ts_last_high = self.linear_search(rfr, offset_high, offset_high+sample_bytes, 100, ts_high)
+            max_bytes = sample_bytes
+            min_bytes = 0
 
-        #rich.print(ts_first_low, ts_last_high)
+        rich.print(ts_first_low, ts_last_high)
         return offset_low, offset_high
 
     def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
@@ -247,6 +258,7 @@ class RawDataManager:
 
         off_chans = [self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(hdr_info[1], hdr_info[2], hdr_info[3], c) for c in range(256)]
 
+        #rich.print(n_frames)
         ts = self.blk_unpack.np_array_timestamp_data(blk.as_capsule(), n_frames)
         adcs = self.blk_unpack.np_array_adc_data(blk.as_capsule(), n_frames)
 

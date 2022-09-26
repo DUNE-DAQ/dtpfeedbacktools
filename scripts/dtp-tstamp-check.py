@@ -47,8 +47,9 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]),
               help="Select input frame type", default="WIB")
 @click.option('-o', '--outname', default="./tstamp.png")
+@click.option('--old_format', is_flag=True, default=False)
 
-def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type: str, outname: str) -> None:
+def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type: str, outname: str, old_format: bool) -> None:
 
     rdm = RawDataManager(files_path, frame_type, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
@@ -74,7 +75,11 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type
             
         file_list.append(f)
 
-        link = rdm.get_link(f)
+        if old_format:
+            link = 5+6*rdm.get_link(f)
+        else:
+            link = rdm.get_link(f)
+
         links[i] = link
 
         tstamps[i] = rdm.find_tp_ts_minmax(f)
@@ -90,9 +95,17 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type
 
         tstamps[i+len(tp_files)] = rdm.find_tpc_ts_minmax(f)
 
-        indx = np.where(links == 10+1*int(link > 4))[0][0]
-        overlaps[i+len(tp_files)] = overlap_check(tstamps[indx], tstamps[i+len(tp_files)])
-        
+        try:
+            if old_format:
+                indx = np.where(links == 5+6*int(link > 5))[0][0]
+            else:
+                indx = np.where(links == 10+1*int(link > 4))[0][0]
+            overlaps[i+len(tp_files)] = overlap_check(tstamps[indx], tstamps[i+len(tp_files)])
+        except IndexError:
+            rich.print("Warning! Either you are missing a TP file or the naming of your files is not correct...")
+            overlaps[i+len(tp_files)] = np.array([False, 0])
+
+
     indx = links.argsort()
     tstamps = tstamps[indx]
     links = links[indx]

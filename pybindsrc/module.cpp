@@ -45,12 +45,12 @@ namespace dunedaq
             // Work in bytes
             auto buf_u8 = static_cast<uint8_t*>(buf);
             size_t buf_size = n_blocks * sizeof(FWTPHeader);
-            // std::cout << buf_size << std::endl;
+          // std::cout << buf_size << std::endl;
 
             // Find the first occurence of f00d
             for (; offset_pad1<buf_size; ++offset_pad1) {
 
-              // std::cout << std::hex << std::setfill('0')
+              //std::cout << std::hex << std::setfill('0')
               //   << ">> 0x"  << std::setw(2) << +buf_u8[offset_pad1+1] 
               //   << " 0x"  << std::setw(2) << +buf_u8[offset_pad1] 
               //   << " -- 0x" << std::setw(4) << ((buf_u8[offset_pad1+1]<<8)+buf_u8[offset_pad1])
@@ -78,7 +78,7 @@ namespace dunedaq
           // std::cout << "offset mem =" << offset << std::endl;
 
           size_t i_trl_0((offset_trl-offset)/sizeof(FWTPHeader));
-        //  std::cout << "i_trl_0 = " << i_trl_0 << std::endl;
+          // std::cout << "i_trl_0 = " << i_trl_0 << std::endl;
 
           FWTPHeader *hdr = static_cast<FWTPHeader *>(buf+offset);
           FWTPTrailer *trl = static_cast<FWTPTrailer *>(buf+offset);
@@ -92,21 +92,27 @@ namespace dunedaq
             i = i_trl_0+1;
           }
 
-          // std::cout << "starting from block " << i << " (byte offset " ")" << offset << std::endl;
+        // std::cout << "starting from block " << i << " (byte offset " ")" << offset << std::endl;
 
           size_t i_hdr(i), i_trl(i);
+
+          //std::cout << "n blocks " << n_blocks << std::endl;
 
           for (; i<n_blocks; ++i) {
 
             if (trl[i].padding_1 != trl_magic) {
+              //std::cout << "Something went terribly wrong..." << std::endl;
+              //std::cout << "trl.padding_1 " << trl[i].padding_1 << std::endl;
               continue;
             }
+            //std::cout << "iblock " << i << std::endl;
+            //std::cout << "trl.padding_1 " << trl[i].padding_1 << std::endl;
 
             i_trl = i;
 
             int64_t n_hits = ((int64_t)i_trl-((int64_t)i_hdr+1));
             if (  n_hits < 1 ) {
-              //std::cout << "Block " << i << " -> " << n_hits << " ~ " <<i_trl << " " << i_hdr << std::endl;
+              std::cout << "Block " << i << " -> " << n_hits << " ~ " <<i_trl << " " << i_hdr << std::endl;
             } else {
               fwtps.push_back(FWTP((void*)(hdr+i_hdr), i_trl-(i_hdr+1)));
             }

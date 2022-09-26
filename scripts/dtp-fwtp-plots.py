@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os.path
 from dtpfeedbacktools.rawdatamanager import RawDataManager
 import sys
 import rich
@@ -17,6 +18,9 @@ from functools import reduce
 
 tp_block_size = 3
 tp_block_bytes = tp_block_size*4
+
+wib_frame_size = 118
+wib_frame_bytes = wib_frame_size*4
 
 #fir_coefficients = [0,0,0,0,0,0,0,0,2,4,6,7,9,11,12,13,13,12,11,9,7,6,4,2,0,0,0,0,0,0,0,0]
 #fir_correction = 64/np.linalg.norm(fir_coefficients)
@@ -97,6 +101,7 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
 
         links[i+len(tp_files)] = link
         tstamps[i+len(tp_files)] = rdm.find_tpc_ts_minmax(f)
+        rich.print(rdm.find_tpc_ts_minmax(f))
 
         if old_format:
             indx = np.where(links == 5+6*int(link > 5))[0][0]
@@ -128,18 +133,21 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
         rtpc_temp = []
         for j in range(len(new_boundaries)):
 
-            offset_low, offset_high = rdm.linear_search_tp(tp, int(new_boundaries[j,2]), int(new_boundaries[j,3]))
+            offset_low, offset_high = rdm.linear_search_tp(tp, int(new_boundaries[j,2]), int(new_boundaries[j,3]), 4)
             offsets[j,0] = offset_low
             offsets[j,1] = offset_high
 
-            rtpc_temp.append(rdm.load_tpcs(new_boundaries[j,0]))
+            rich.print(new_boundaries[j,0])
+            rtpc_temp.append(rdm.load_tpcs(new_boundaries[j,0], int(10e5), int(os.path.getsize(os.path.join(rdm.data_path, new_boundaries[j,0]))//wib_frame_bytes)//2))
+            #rtpc_temp.append(rdm.load_tpcs(new_boundaries[j,0]))
 
         offsets_low = np.max(offsets[:,0])
         offsets_high = np.min(offsets[:,1])
 
         rich.print(f'Opening TPs and ADCs in the overlap region')
 
-        rtp_df = rdm.load_tps(tp, int((offsets_high-offsets_low)//tp_block_bytes), int(offsets_low//tp_block_bytes))
+        #rtp_df = rdm.load_tps(tp, int((offsets_high-offsets_low)//tp_block_bytes), int(offsets_low//tp_block_bytes))
+        rtp_df = rdm.load_tps(tp, int(tp_block_bytes*10000), int(offsets_low//tp_block_bytes)+int((offsets_high-offsets_low)//tp_block_bytes)//16)
         rich.print(rtp_df)
 
         rtpc_df = reduce(lambda df1,df2: pd.merge(df1,df2,on='ts'), rtpc_temp)
@@ -148,7 +156,8 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
         #rtp_df.to_hdf("rtp.hdf5", key="rtp")
         #rtpc_df.to_hdf("rtpc.hdf5", key="rtp")
 
-        plot_offset = len(rtp_df)//2
+        plot_offset = np.nonzero((rtp_df["ts"].values > rtpc_df.index[0])&(rtp_df["ts"].values < rtpc_df.index[-1]))[0][0]+1
+        #plot_offset = len(rtp_df)//6
 
         n = 0
         pdf = matplotlib.backends.backend_pdf.PdfPages(out_path)
@@ -156,6 +165,8 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             if(n >= n_plots): break
 
             tstamp = rtp_df["ts"][plot_offset+i]
+            if(i == 0):
+                rich.print(tstamp)
             channel = rtp_df["offline_ch"][plot_offset+i]
             time_start = rtp_df["start_time"][plot_offset+i]
             time_end = rtp_df["end_time"][plot_offset+i]

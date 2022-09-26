@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
 plt.style.use('ggplot')
 
-header_labels = {'offline_ch':("offline channel", ""), 'crate_no':("crate", ""), 'slot_no':("slot", ""), 'fiber_no':("fiber", ""), 'wire_no':("wire index", ""), 'flags':("flags", "")}
+header_labels = {'offline_ch':("offline channel", ""), 'crate_no':("crate", ""), 'slot_no':("slot", ""), 'fiber_no':("fiber", ""), 'wire_no':("wire index", ""), 'ts':("time stamp", " [tts]")}
 hit_labels = {'start_time':("start time", " [ticks]"), 'end_time':("end time", " [ticks]"), 'peak_time':("peak time", " [ticks]"), 'peak_adc':("peak adc", " [ADCs]"), 'hit_continue':("hit continue", ""), 'sum_adc':("sum adc", " [adc]")}
 pedinfo_labels = {'median':("median", " [ADCs]"), 'accumulator':("accumulator", "")}
 all_plots = {"header":header_labels, "hit":hit_labels, "pedinfo":pedinfo_labels}
@@ -104,8 +104,8 @@ def cli(interactive: bool, save_df: bool, n_lines: int, files_path: str, map_id:
         if save_df:
             rtp_df.to_hdf("rtp_"+f.replace(".out", "")+".hdf5", key="rtp")
         
-        outname = os.path.join(outpath, f.replace(".out", ".pdf"))
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outname)
+        #outname = os.path.join(outpath, f.replace(".out", ".pdf"))
+        #pdf = matplotlib.backends.backend_pdf.PdfPages(outname)
 
         fig = plt.figure(figsize=(30,14))
         gs = fig.add_gridspec(3, 6, hspace=0.3, wspace=0.5, height_ratios=[1.5,1.5,1.5])
@@ -122,7 +122,8 @@ def cli(interactive: bool, save_df: bool, n_lines: int, files_path: str, map_id:
             density_scatter(rtp_df, "wire_no", var, axs[1,j], header_labels, hit_labels, nbinsy)
             density_scatter(rtp_df, "offline_ch", var, axs[2,j], header_labels, hit_labels, nbinsy)
 
-        pdf.savefig()
+        #pdf.savefig()
+        plt.savefig(os.path.join(outpath, f.replace(".out", "_hits.png")), dpi=500)
         plt.close()
 
         fig = plt.figure(figsize=(14,8))
@@ -130,9 +131,14 @@ def cli(interactive: bool, save_df: bool, n_lines: int, files_path: str, map_id:
         axs = gs.subplots()
 
         for j, var in enumerate(header_labels.keys()):
-            hist_plot(rtp_df, var, axs[int(j>2),j-3*int(j>2)], header_labels, ylabel="# hit packets")
+            if(var == "ts"):
+                nbins = 100
+            else:
+                nbins = None
+            hist_plot(rtp_df, var, axs[int(j>2),j-3*int(j>2)], header_labels, nbins, ylabel="# hit packets")
 
-        pdf.savefig()
+        #pdf.savefig()
+        plt.savefig(os.path.join(outpath, f.replace(".out", "_header.png")), dpi=500)
         plt.close()
 
         fig = plt.figure(figsize=(9.5,3.5))
@@ -142,10 +148,11 @@ def cli(interactive: bool, save_df: bool, n_lines: int, files_path: str, map_id:
         hist_plot(rtp_df, "median", axs[0], pedinfo_labels, nbins=100, ylabel="# hit packets")
         hist_plot(rtp_df, "accumulator", axs[1], pedinfo_labels, ylabel="# hit packets")
 
-        pdf.savefig()
+        #pdf.savefig()
+        plt.savefig(os.path.join(outpath, f.replace(".out", "_ped.png")), dpi=500)
         plt.close()
 
-        pdf.close()
+        #pdf.close()
 
     if interactive:
         import IPython
