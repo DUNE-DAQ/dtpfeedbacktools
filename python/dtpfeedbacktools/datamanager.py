@@ -239,7 +239,6 @@ class DataManager:
             frag = rdf.get_frag((entry, 0),sid)
             frag_hdr = frag.get_header()
 
-            #logging.debug(f"Inspecting {sid.system_type} {sid.region_id} {sid.element_id}")
             logging.debug(f"Inspecting {sid.version}, {sid.subsystem}, {sid.id}")
             logging.debug(f"Run number : {frag.get_run_number()}")
             logging.debug(f"Trigger number : {frag.get_trigger_number()}")
@@ -312,7 +311,7 @@ class DataManager:
         rdf = hdf5libs.HDF5RawDataFile(file_path) # number of events = 10000 is not used
 
         tr_hdr = rdf.get_trh((tr_num,0))
-        tr_geo_ids = rdf.get_geo_ids((tr_num, 0))
+        tr_source_ids = rdf.get_source_ids((tr_num, 0))
 
 
         tr_info = {
@@ -326,11 +325,11 @@ class DataManager:
 
         tpc_dfs = []
         tp_array = []
-        for geoid in tr_geo_ids:
-            frag = rdf.get_frag((tr_num, 0),geoid)
+        for sid in tr_source_ids:
+            frag = rdf.get_frag((tr_num, 0),sid)
             frag_hdr = frag.get_header()
 
-            logging.debug(f"Inspecting {geoid.system_type} {geoid.region_id} {geoid.element_id}")
+            logging.debug(f"Inspecting {sid.version}, {sid.subsystem}, {sid.id}")
             logging.debug(f"Run number : {frag.get_run_number()}")
             logging.debug(f"Trigger number : {frag.get_trigger_number()}")
             logging.debug(f"Trigger TS    : {frag.get_trigger_timestamp()}")
@@ -340,11 +339,7 @@ class DataManager:
             logging.debug(f"Fragment code : {frag.get_fragment_type_code()}")
             logging.debug(f"Size          : {frag.get_size()}")
 
-            # if geoid.system_type !=  daqdataformats.GeoID.kTPC:
-                # logging.debug("Non-TPC TR - skipping")
-                # continue
-
-            if geoid.system_type ==  daqdataformats.GeoID.kTPC:
+            if sid.subsytem ==  self.frag_type:
                 payload_size = (frag.get_size()-frag_hdr.sizeof())
                 if not payload_size:
                     continue
@@ -357,7 +352,7 @@ class DataManager:
                 ts = self.frag_unpack.np_array_timestamp(frag)
                 adcs = self.frag_unpack.np_array_adc(frag)
                 ts = (ts - tr_ts).astype('int64')
-                logging.debug(f"Unpacking {geoid.system_type} {geoid.region_id} {geoid.element_id} completed")
+                logging.debug(f"Unpacking {sid.version}, {sid.subsystem}, {sid.id} completed")
 
                 df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]) for c in range(256)]))
                 df = df.set_index('ts')
@@ -365,7 +360,7 @@ class DataManager:
 
                 tpc_dfs.append(df)
 
-            elif geoid.system_type == daqdataformats.GeoID.kDataSelection and frag.get_fragment_type() == daqdataformats.FragmentType.kTriggerPrimitives:
+            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kSW_TriggerPrimitive:
                 tp_size = detdataformats.trigger_primitive.TriggerPrimitive.sizeof()
                 n_frames = (frag.get_size()-frag_hdr.sizeof())//tp_size
                 rich.print(f"Number of TPS frames: {n_frames}")
