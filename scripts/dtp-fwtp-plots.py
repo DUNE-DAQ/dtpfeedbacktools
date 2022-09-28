@@ -22,8 +22,6 @@ tp_block_bytes = tp_block_size*4
 wib_frame_size = 118
 wib_frame_bytes = wib_frame_size*4
 
-#fir_coefficients = [0,0,0,0,0,0,0,0,2,4,6,7,9,11,12,13,13,12,11,9,7,6,4,2,0,0,0,0,0,0,0,0]
-#fir_correction = 64/np.linalg.norm(fir_coefficients)
 fir_correction = 1
 
 NS_PER_TICK = 16
@@ -31,7 +29,7 @@ NS_PER_TICK = 16
 def overlap_check(tp_tstamp, adc_tstamp):
     overlap_true = (adc_tstamp[0] <= tp_tstamp[1])&(adc_tstamp[1] >= tp_tstamp[0])
     overlap_time = max(0, min(tp_tstamp[1], adc_tstamp[1]) - max(tp_tstamp[0], adc_tstamp[0]))
-    return np.array([overlap_true, overlap_time])
+    return overlap_true, overlap_time
 
 def overlap_boundaries(tp_tstamp, adc_tstamp):
     return [max(tp_tstamp[0], adc_tstamp[0]), min(tp_tstamp[1], adc_tstamp[1])]
@@ -62,68 +60,23 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame_type: str, n_plots: int, threshold: int, out_path: str) -> None:
 
-    rdm = RawDataManager(files_path, frame_type, map_id)
+    rdm = RawDataManager(files_path, frame_type, map_id, old_format)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
     rich.print(tp_files)
     rich.print(adc_files)
-    
-    tstamps = -np.ones((len(tp_files)+len(adc_files), 2), dtype=int)
-    links = -np.ones(len(tp_files)+len(adc_files), dtype=int)
-    overlaps = -np.ones((len(tp_files)+len(adc_files), 2), dtype=int)
-    file_list = []
-    
-    t = Table()
-    t.add_column("adc filename", style="green")
-    t.add_column("tp filename", style="green")
-    t.add_column("overlap start")
-    t.add_column("overlap end")
 
-    boundaries = []
+    t, overlap_summary_df = rdm.check_overlap()
 
-    for i, f in enumerate(tp_files):
-        file_list.append(f)
+    rich.print(overlap_summary_df)
+    return
 
-        if old_format:
-            link = 5+6*rdm.get_link(f)
-        else:
-            link = rdm.get_link(f)
-        
-        links[i] = link
-        tstamps[i] = rdm.find_tp_ts_minmax(f)
-        overlaps[i] = np.array([False, 0])
-
-    for i, f in enumerate(adc_files):
-
-        file_list.append(f)
-
-        link = rdm.get_link(f)
-
-        links[i+len(tp_files)] = link
-        tstamps[i+len(tp_files)] = rdm.find_tpc_ts_minmax(f)
-        rich.print(rdm.find_tpc_ts_minmax(f))
-
-        if old_format:
-            indx = np.where(links == 5+6*int(link > 5))[0][0]
-        else:
-            indx = np.where(links == 10+1*int(link > 4))[0][0]
-        overlaps[i+len(tp_files)] = overlap_check(tstamps[indx], tstamps[i+len(tp_files)])
-
-        if overlaps[i+len(tp_files), 0]:
-            overlap_boundary = overlap_boundaries(tstamps[indx], tstamps[i+len(tp_files)])
-            boundaries.append([file_list[i+len(tp_files)], file_list[indx]]+overlap_boundary)
-            t.add_row(file_list[i+len(tp_files)], file_list[indx], str(overlap_boundary[0]), str(overlap_boundary[1]))
-        
-    boundaries = np.array(boundaries)
-
-    print(t)
 
     overlap_tps = np.unique(boundaries[:,1])
     rich.print(overlap_tps)
 
     #rtpc0_df = rdm.load_tpcs(boundaries[0,0])
     #rtpc1_df = rdm.load_tpcs(boundaries[1,0])
-
 
     for tp in overlap_tps:
         new_boundaries = boundaries[boundaries[:,1] == tp]
@@ -147,7 +100,7 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
         rich.print(f'Opening TPs and ADCs in the overlap region')
 
         #rtp_df = rdm.load_tps(tp, int((offsets_high-offsets_low)//tp_block_bytes), int(offsets_low//tp_block_bytes))
-        rtp_df = rdm.load_tps(tp, int(tp_block_bytes*10000), int(offsets_low//tp_block_bytes)+int((offsets_high-offsets_low)//tp_block_bytes)//16)
+        rtp_df = rdm.load_tps(tp, int(tp_block_bytes*100000), int(offsets_low//tp_block_bytes)+int((offsets_high-offsets_low)//tp_block_bytes)//16)
         rich.print(rtp_df)
 
         rtpc_df = reduce(lambda df1,df2: pd.merge(df1,df2,on='ts'), rtpc_temp)
@@ -158,7 +111,8 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
 
         plot_offset = np.nonzero((rtp_df["ts"].values > rtpc_df.index[0])&(rtp_df["ts"].values < rtpc_df.index[-1]))[0][0]+1
         #plot_offset = len(rtp_df)//6
-
+        plot_offset += 100000
+        zoom_extra_range = 32*64*16
         n = 0
         pdf = matplotlib.backends.backend_pdf.PdfPages(out_path)
         for i in range(1000):
@@ -181,7 +135,8 @@ def cli(interactive: bool, old_format: bool, files_path: str, map_id: str, frame
             median = rtpc_df[channel].median()
             sigma = rtpc_df[channel].std()
 
-            adc_data = rtpc_df.loc[tstamp-32*64:tstamp+32*64*2, channel]
+            adc_data = rtpc_df.loc[tstamp-zoom_extra_range:tstamp+zoom_extra_range, channel]
+
             adc = adc_data.values
             time = adc_data.index.astype(int) - tstamp
 

@@ -4,6 +4,7 @@ from os import walk
 import fnmatch
 import re
 import ctypes
+from itertools import chain
 
 import detdataformats
 import detchannelmaps
@@ -14,6 +15,7 @@ from dtpfeedbacktools import FWTPHeader, FWTPData, FWTPTrailer
 
 import rich
 from rich import print as rprint
+from rich.table import Table
 import numpy as np
 import pandas as pd
 import collections
@@ -71,7 +73,7 @@ class RawDataManager:
         else:
             raise RuntimeError(f"Unknown channel map id '{map_id}'")
 
-    def __init__(self, data_path: str, frame_type: str = 'WIB', ch_map_id: str = 'HDColdbox') -> None:
+    def __init__(self, data_path: str, frame_type: str = 'WIB', ch_map_id: str = 'HDColdbox', old_tp_naming_format: bool = False) -> None:
 
         if not os.path.isdir(data_path):
             raise ValueError(f"Directory {data_path} does not exist")
@@ -79,6 +81,7 @@ class RawDataManager:
         self.data_path = data_path
         self.ch_map_name = ch_map_id
         self.ch_map = self.make_channel_map(ch_map_id)
+        self.old_tp_naming_format = old_tp_naming_format
 
         self.get_hdr_info, self.blk_unpack = self.frametype_map[frame_type]
 
@@ -98,7 +101,72 @@ class RawDataManager:
     def get_link(self, file_name: str):
         #return max([int(s) for s in file_name.replace(".out", "").split("_") if s.isdigit()])
         return int(file_name.replace(".out", "").split("_")[-1])
-    
+
+    def get_link_assn(self, adc_file, tp_files):
+        adc_link = self.get_link(adc_file)
+        if self.old_tp_naming_format:
+            target_tp_link = 5+6*int(adc_link > 5)
+        else:
+            target_tp_link = 10+1*int(adc_link > 4)
+        for i, tp_file in enumerate(tp_files):
+            if self.old_tp_naming_format:
+                tp_link = 5+6*self.get_link(tp_file)
+            else:
+                tp_link = self.get_link(tp_file)
+            if(tp_link == target_tp_link):
+                return i
+            else:
+                continue
+
+    def get_overlap(self, tp_tstamp, adc_tstamp):
+        overlap_true = (adc_tstamp[0] <= tp_tstamp[1])&(adc_tstamp[1] >= tp_tstamp[0])
+        overlap_time = max(0, min(tp_tstamp[1], adc_tstamp[1]) - max(tp_tstamp[0], adc_tstamp[0]))
+        return overlap_true, overlap_time
+
+    def get_overlap_boundaries(self, tp_tstamp, adc_tstamp):
+        return max(tp_tstamp[0], adc_tstamp[0]), min(tp_tstamp[1], adc_tstamp[1])
+
+    def check_overlap(self):
+        t = Table()
+        t.add_column("filename", style="green")
+        t.add_column("link #")
+        t.add_column("timestamp_min")
+        t.add_column("relative offset (timestamp ticks)")
+        t.add_column("capture length (timestamp ticks)")
+        t.add_column("capture length (s)")
+        t.add_column("overlap (s)")
+
+        tp_files, adc_files = sorted(self.list_files(), reverse=True)
+        rich.print(tp_files)
+        rich.print(adc_files)
+
+        tsmin_tps, tsmax_tps = map(list, zip(*map(self.find_tp_ts_minmax, tp_files)))
+        tsmin_adcs, tsmax_adcs = map(list, zip(*map(self.find_tpc_ts_minmax, adc_files)))
+
+        adc_tp_assn = [self.get_link_assn(adc_file, tp_files) for i, adc_file in enumerate(adc_files)]
+
+        overlap_true, overlap_time = map(list, zip(*map(self.get_overlap, [[tsmin_tps[adc_tp_assn[i]], tsmax_tps[adc_tp_assn[i]]] for i in range(len(adc_files))], [[tsmin_adcs[i], tsmax_adcs[i]] for i in range(len(adc_files))])))
+        #rich.print(overlap_true)
+        #rich.print(overlap_time)
+
+        tstamp_reference = min(min(tsmin_tps), min(tsmin_adcs))
+        overlap_summary_list = []
+
+        for i, tp_file in enumerate(tp_files):
+            t.add_row(tp_file, str(self.get_link(tp_file)), str(tsmin_tps[i]), str(tsmin_tps[i]-tstamp_reference), str(tsmax_tps[i]-tsmin_tps[i]), str((tsmax_tps[i]-tsmin_tps[i])/62.5e6), "")
+        
+        for i, adc_file in enumerate(adc_files):
+            if overlap_true[i]:
+                t.add_row(adc_file, str(self.get_link(adc_file)), str(tsmin_adcs[i]), str(tsmin_adcs[i]-tstamp_reference), str(tsmax_adcs[i]-tsmin_adcs[i]), str((tsmax_adcs[i]-tsmin_adcs[i])/62.5e6), str(overlap_time[i]/62.5e6), style="red")
+                overlap_boundary_min, overlap_boundary_max = self.get_overlap_boundaries([tsmin_tps[adc_tp_assn[i]], tsmax_tps[adc_tp_assn[i]]], [tsmin_adcs[i], tsmax_adcs[i]])
+                overlap_summary_list.append([tp_files[adc_tp_assn[i]], adc_file, overlap_boundary_min, overlap_boundary_max])
+            else:
+                t.add_row(adc_file, str(self.get_link(adc_file)), str(tsmin_adcs[i]), str(tsmin_adcs[i]-tstamp_reference), str(tsmax_adcs[i]-tsmin_adcs[i]), str((tsmax_adcs[i]-tsmin_adcs[i])/62.5e6), str(overlap_time[i]/62.5e6))
+        
+        overlap_summary_df = pd.DataFrame(overlap_summary_list, columns=["tp_file", "adc_file", "start_overlap", "end_overlap"])
+
+        return t, overlap_summary_df
+
     def fwtp_list_to_df(self, fwtps: list):
         fwtp_array = []
 
@@ -282,4 +350,4 @@ class RawDataManager:
         first_ts = self.blk_unpack.np_array_timestamp_data(first_blk.as_capsule(), n_frames)
         last_ts = self.blk_unpack.np_array_timestamp_data(last_blk.as_capsule(), n_frames)
         
-        return first_ts, last_ts
+        return first_ts[0], last_ts[0]

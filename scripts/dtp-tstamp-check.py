@@ -57,70 +57,7 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type
     rich.print(tp_files)
     rich.print(adc_files)
 
-    t = Table()
-    t.add_column("filename", style="green")
-    t.add_column("link #")
-    t.add_column("timestamp_min")
-    t.add_column("relative offset (timestamp ticks)")
-    t.add_column("capture length (timestamp ticks)")
-    t.add_column("capture length (s)")
-    t.add_column("overlap (s)")
-    
-    tstamps = -np.ones((len(tp_files)+len(adc_files), 2), dtype=int)
-    links = -np.ones(len(tp_files)+len(adc_files), dtype=int)
-    overlaps = -np.ones((len(tp_files)+len(adc_files), 2), dtype=int)
-    file_list = []
-    
-    for i, f in enumerate(tp_files):
-            
-        file_list.append(f)
-
-        if old_format:
-            link = 5+6*rdm.get_link(f)
-        else:
-            link = rdm.get_link(f)
-
-        links[i] = link
-
-        tstamps[i] = rdm.find_tp_ts_minmax(f)
-
-        overlaps[i] = np.array([False, 0])
-
-    for i, f in enumerate(adc_files):
-
-        file_list.append(f)
-
-        link = rdm.get_link(f)
-        links[i+len(tp_files)] = link
-
-        tstamps[i+len(tp_files)] = rdm.find_tpc_ts_minmax(f)
-
-        try:
-            if old_format:
-                indx = np.where(links == 5+6*int(link > 5))[0][0]
-            else:
-                indx = np.where(links == 10+1*int(link > 4))[0][0]
-            overlaps[i+len(tp_files)] = overlap_check(tstamps[indx], tstamps[i+len(tp_files)])
-        except IndexError:
-            rich.print("Warning! Either you are missing a TP file or the naming of your files is not correct...")
-            overlaps[i+len(tp_files)] = np.array([False, 0])
-
-
-    indx = links.argsort()
-    tstamps = tstamps[indx]
-    links = links[indx]
-    overlaps = overlaps[indx]
-    file_list = np.array(file_list, dtype=str)
-    file_list = file_list[indx]
-    tstamp_reference = np.min(tstamps[tstamps>0])
-
-    for i in range(len(tstamps)):
-        if links[i] == -1:
-            continue
-        if overlaps[i,0]:
-            t.add_row(file_list[i], str(links[i]), str(tstamps[i,0]), str(tstamps[i,0]-tstamp_reference), str(tstamps[i,1]-tstamps[i,0]), str((tstamps[i,1]-tstamps[i,0])/62.5e6), str(overlaps[i,1]/62.5e6), style="red")
-        else:
-            t.add_row(file_list[i], str(links[i]), str(tstamps[i,0]), str(tstamps[i,0]-tstamp_reference), str(tstamps[i,1]-tstamps[i,0]), str((tstamps[i,1]-tstamps[i,0])/62.5e6), "")
+    t, overlap_summary_df = rdm.check_overlap()
             
     print(t)
 
