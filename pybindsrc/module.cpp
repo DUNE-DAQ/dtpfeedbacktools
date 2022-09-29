@@ -50,12 +50,6 @@ namespace dunedaq
             // Find the first occurence of f00d
             for (; offset_pad1<buf_size; ++offset_pad1) {
 
-              //std::cout << std::hex << std::setfill('0')
-              //   << ">> 0x"  << std::setw(2) << +buf_u8[offset_pad1+1] 
-              //   << " 0x"  << std::setw(2) << +buf_u8[offset_pad1] 
-              //   << " -- 0x" << std::setw(4) << ((buf_u8[offset_pad1+1]<<8)+buf_u8[offset_pad1])
-              //   << std::endl;
-
               if (((buf_u8[offset_pad1+1]<<8)+buf_u8[offset_pad1]) != trl_magic) {
                 continue;
               }
@@ -66,19 +60,14 @@ namespace dunedaq
 
               break;
             }
-          // std::cout << std::dec;
-          // std::cout << "offset f00d = " << offset_pad1 << std::endl;
 
           // work back the trailer offset
           offset_trl= offset_pad1-offset_of(&FWTPTrailer::padding_1);
-          // std::cout << "offset trailer = " << offset_trl << std::endl;
 
           // calculate the binary to mem block phase
           offset = offset_trl % sizeof(FWTPHeader);
-          // std::cout << "offset mem =" << offset << std::endl;
 
           size_t i_trl_0((offset_trl-offset)/sizeof(FWTPHeader));
-          // std::cout << "i_trl_0 = " << i_trl_0 << std::endl;
 
           FWTPHeader *hdr = static_cast<FWTPHeader *>(buf+offset);
           FWTPTrailer *trl = static_cast<FWTPTrailer *>(buf+offset);
@@ -120,7 +109,7 @@ namespace dunedaq
             i_hdr = i+1;
           }
 
-          return std::move(fwtps);
+          return fwtps;
       }
 
       //-----------------
@@ -201,7 +190,7 @@ namespace dunedaq
           );
 
 
-        return std::move(fwtp_arrays);
+        return fwtp_arrays;
       }
 
       py::dict unpack_fwtps_to_arrays(void *buf, size_t n_blocks, bool safe_mode=true) {
