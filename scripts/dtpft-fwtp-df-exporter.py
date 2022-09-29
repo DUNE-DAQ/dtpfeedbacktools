@@ -165,17 +165,10 @@ def scan_tp_ts_offsets(tp_file, n_samples = 128):
 
     return ts_offsets
 
-
-def overlap_check(tp_tstamp, adc_tstamp):
-    overlap_true = (adc_tstamp[0] <= tp_tstamp[1])&(adc_tstamp[1] >= tp_tstamp[0])
-    overlap_time = max(0, min(tp_tstamp[1], adc_tstamp[1]) - max(tp_tstamp[0], adc_tstamp[0]))
-    return np.array([overlap_true, overlap_time])
-
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
-@click.option('-i', '--interactive', is_flag=True, default=False)
-@click.option('-p', '--plots', is_flag=True, help="Generate a plot", default=False)
 @click.argument('files_path', type=click.Path(exists=True))
+@click.option('-i', '--interactive', is_flag=True, default=False)
 @click.option('-m', '--map_id', type=click.Choice(
     [
         "VDColdbox",
@@ -184,19 +177,20 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "PD2HD",
         "VST"
     ]),
-              help="Select input channel map", default="HDColdbox")
+    help="Select input channel map", default="HDColdbox")
 @click.option('-f', '--frame_type', type=click.Choice(
     [
         "ProtoWIB",
         "WIB"
     ]),
-              help="Select input frame type", default="WIB")
-@click.option('-o', '--outname', default="./tstamp.png")
-@click.option('--old_format', is_flag=True, default=False)
+    help="Select input frame type", default="WIB")
+@click.option('-o', '--outdir', type=click.Path(), default=".")
+@click.option('-s', '--split-factor', type=int, default=5)
 
-def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type: str, outname: str, old_format: bool) -> None:
+def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str, split_factor: int) -> None:
 
     capture_path = Path(files_path)
+    outdir = Path(outdir)
     if not capture_path.is_dir():
         raise click.Abort("f{captuure_path} is not a directory")
 
@@ -251,27 +245,20 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type
         # trim
         rtp_df = rtp_df[(rtp_df["ts"] > c.ts_overlap_min) & (rtp_df["ts"] < c.ts_overlap_max) ]
 
-        n_bins = 20
+        # Calculate splitting intervals
+        n_bins = split_factor
         ts_edges = [c.ts_overlap_min + x * (c.ts_overlap_max- c.ts_overlap_min) // n_bins for x in range(n_bins + 1)]
         ts_bins  = [(ts_edges[k], ts_edges[k+1]) for k in range(n_bins)]
 
         for i, (ts_min, ts_max) in enumerate(ts_bins):
 
             print("File {i} - ts ragnge (f{ts_min}-{ts_max})")
-            store = pd.HDFStore(capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5')
+            store = pd.HDFStore( outdir / capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5')
             print("Saving raw tps dataframe")
             rtp_df[ (rtp_df['ts'] >= ts_min) & ( rtp_df['ts'] < ts_max) ].to_hdf(store, 'raw_fwtps')
             print("Saving raw adcs dataframe")
             radc_df[(radc_df.index >= ts_min) & (radc_df.index < ts_max)].to_hdf(store, 'raw_adcs')
             store.close()
-
-        # import IPython
-        # IPython.embed(color="neutral")
-
-        # store = pd.HDFStore(capture_path.name + f'_tp_link{c.tp_file.link_id}.hdf5')
-        # rtp_df.to_hdf(store, 'raw_fwtps')
-        # radc_df.to_hdf(store, 'raw_adcs')
-        
 
     if interactive:
         import IPython
