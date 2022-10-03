@@ -84,7 +84,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     ax = fig.add_subplot(gs[0,0:2])
     
     props_record = dict(boxstyle='square', facecolor='white', alpha=1)
-    props_tp = dict(boxstyle='square', facecolor='mistyrose', alpha=1)
+    props_tp = dict(boxstyle='square', facecolor='lightcoral', alpha=0.75)
     props_wave = dict(boxstyle='square', facecolor='lightskyblue', alpha=1)
     mono = {'family' : 'monospace'}
     plt.plot(time, adc, 'x-', c="powderblue", label="Raw ADC", linewidth=1.5)
@@ -94,7 +94,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
         plt.axvline(x=-n_packets*pkt_len_ts+i*pkt_len_ts, linestyle="--", c="k", alpha=0.2)
     
     # 
-    plt.axvspan(time_start*tick_per_sample, time_end*tick_per_sample, alpha=0.1, color='red')
+    plt.axvspan(time_start*tick_per_sample, time_end*tick_per_sample, alpha=0.3, color='red')
     # plt.axvspan((time_start-fir_delay)*tick_per_sample, (time_end-15)*tick_per_sample, alpha=0.3, color='red')
     plt.axvline(x=time_peak*tick_per_sample, linestyle="-", c="k", alpha=0.3)
     # plt.axvline(x=(time_peak-fir_delay)*tick_per_sample, linestyle="-", c="k", alpha=0.6)
