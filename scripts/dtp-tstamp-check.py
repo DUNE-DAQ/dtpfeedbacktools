@@ -54,8 +54,8 @@ def cli(interactive: bool, plots: bool, files_path: str, map_id: str, frame_type
     rdm = RawDataManager(files_path, frame_type, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
-    rich.print(tp_files)
-    rich.print(adc_files)
+    # rich.print(tp_files)
+    # rich.print(adc_files)
 
     t = Table()
     t.add_column("filename", style="green")

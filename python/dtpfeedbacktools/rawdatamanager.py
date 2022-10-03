@@ -10,7 +10,6 @@ import detchannelmaps
 import rawdatautils.unpack.wib as protowib_unpack
 import rawdatautils.unpack.wib2 as wib_unpack
 import dtpfeedbacktools
-from dtpfeedbacktools import FWTPHeader, FWTPData, FWTPTrailer
 
 import rich
 from rich import print as rprint
@@ -23,6 +22,8 @@ tp_block_bytes = tp_block_size*4
 
 wib_frame_size = 118
 wib_frame_bytes = wib_frame_size*4
+
+wib_sample_in_ts = 32
 
 def get_protowib_header_info( blk ):
         wf = detdataformats.wib.WIBFrame(blk.as_capsule())
@@ -184,6 +185,45 @@ class RawDataManager:
 
         return first_rtp_df['ts'].min(), last_rtp_df['ts'].max()
 
+    def find_tpc_ts_minmax(self, file_name: str) -> list:
+        file_path = os.path.join(self.data_path, file_name)
+        rfr = dtpfeedbacktools.RawFileReader(file_path)
+
+        max_frames = rfr.get_size() // wib_frame_bytes
+        max_bytes = max_frames * wib_frame_bytes
+
+        n_frames = 1
+        n_bytes = wib_frame_bytes*n_frames
+        first_blk = rfr.read_block(n_bytes)
+        last_blk = rfr.read_block(n_bytes, max_bytes-n_bytes)
+
+        first_ts = self.blk_unpack.np_array_timestamp_data(first_blk.as_capsule(), n_frames)[0]
+        last_ts = self.blk_unpack.np_array_timestamp_data(last_blk.as_capsule(), n_frames)[-1]
+        
+        rich.print((last_ts-first_ts)//32*wib_frame_bytes, rfr.get_size())
+
+        if (last_ts-first_ts)//wib_sample_in_ts*wib_frame_bytes > rfr.get_size():
+            print("AAAAAA")
+            n_points = 100
+            prev_ts = 0
+            # Switch to scanning
+            frame_step = (max_frames-n_frames)//n_points
+            for offset in range(0, max_frames-n_frames, frame_step):
+                blk = rfr.read_block(n_bytes, offset*wib_frame_bytes)
+                ts = self.blk_unpack.np_array_timestamp_data(blk.as_capsule(), n_frames)[-1]
+                if prev_ts != 0 and (ts-prev_ts) != frame_step * wib_sample_in_ts:
+                    last_ts = prev_ts
+                    break
+                print(offset, ts, ts-first_ts, last_ts-ts, ts-prev_ts)
+                prev_ts = ts
+
+
+            rich.print(last_ts, first_ts)
+        # raise SystemExit(-1)
+        
+        return first_ts, last_ts
+
+
     def linear_search(self, rfr, min_bytes: int, max_bytes: int, samples: int, ts_target: int):
         sample_bytes = (max_bytes-min_bytes)//samples
         n_tpblocks = 32
@@ -238,7 +278,7 @@ class RawDataManager:
     def load_tpcs(self, file_name: str, n_frames: int = -1, offset: int = 0):
         
         file_path = os.path.join(self.data_path, file_name)
-        rprint(f"Opening {file_name}")
+        rprint(f"Loading {file_name}")
         rfr = dtpfeedbacktools.RawFileReader(file_path)
 
         max_frames = rfr.get_size() // wib_frame_bytes
@@ -250,6 +290,10 @@ class RawDataManager:
             n_frames = max_frames
         if offset < 0:
             offset = max_frames + offset
+
+        rich.print(n_frames, offset)
+        rich.print(n_frames*wib_frame_bytes, offset*wib_frame_bytes)
+
         
         blk = rfr.read_block(size=wib_frame_bytes*n_frames, offset=offset*wib_frame_bytes)
 
@@ -267,19 +311,3 @@ class RawDataManager:
         
         return rtpc_df
 
-    def find_tpc_ts_minmax(self, file_name: str) -> list:
-        file_path = os.path.join(self.data_path, file_name)
-        rfr = dtpfeedbacktools.RawFileReader(file_path)
-
-        max_frames = rfr.get_size() // wib_frame_bytes
-        max_bytes = max_frames * wib_frame_bytes
-
-        n_frames = 1
-        n_bytes = wib_frame_bytes*n_frames
-        first_blk = rfr.read_block(n_bytes)
-        last_blk = rfr.read_block(n_bytes, max_bytes-n_bytes)
-
-        first_ts = self.blk_unpack.np_array_timestamp_data(first_blk.as_capsule(), n_frames)
-        last_ts = self.blk_unpack.np_array_timestamp_data(last_blk.as_capsule(), n_frames)
-        
-        return first_ts, last_ts
