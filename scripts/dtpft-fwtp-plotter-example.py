@@ -11,8 +11,8 @@ from pathlib import Path
 
 import click
 
-plt.rcParams['figure.figsize'] = [14., 5.]
-plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.figsize'] = [12., 5.]
+plt.rcParams['figure.dpi'] = 75
 
 def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=None):
     
@@ -20,7 +20,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     fir_delay = 16
     n_packets = 1
     dy_min = -800
-    dy_max = 8000
+    dy_max = 9000
     pkt_len_ts = 32*64
     
     # rtp = rtp_df.iloc[i]
@@ -51,10 +51,12 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     adc_data = raw_adcs.loc[ts_min:ts_max, channel]
     adc = adc_data.values
     time = adc_data.index.astype(int) - tstamp
+    time_del = adc_data.index.astype(int) - tstamp + fir_delay*tick_per_sample
 
     wave_info = '\n'.join((
         f'{"mean = ":<7}{round(mu,2):>6}',
-        f'{"std = ":<7}{round(sigma,2):>6}'))
+        f'{"std = ":<7}{round(sigma,2):>6}')
+        )
 
     tp_info = '\n'.join((
         f'{"median = ":<14}{fw_median:>4}',
@@ -70,7 +72,8 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     fig = plt.figure()
     gs = fig.add_gridspec(1, 3)
     
-    plt.style.use('ggplot')
+    # plt.style.use('ggplot')
+    plt.style.use('seaborn-v0_8-whitegrid')
     with plt.style.context('default'):
         ax = fig.add_subplot(gs[0,2])
         ax.axis('off')
@@ -80,27 +83,28 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
         t.scale(0.7, 0.9)
     ax = fig.add_subplot(gs[0,0:2])
     
-    props_record = dict(boxstyle='square', facecolor='white', alpha=0.8)
-    props_tp = dict(boxstyle='square', facecolor='red', alpha=0.3)
-    props_wave = dict(boxstyle='square', facecolor='dodgerblue', alpha=0.3)
+    props_record = dict(boxstyle='square', facecolor='white', alpha=1)
+    props_tp = dict(boxstyle='square', facecolor='mistyrose', alpha=1)
+    props_wave = dict(boxstyle='square', facecolor='lightskyblue', alpha=1)
     mono = {'family' : 'monospace'}
-    plt.plot(time, adc, c="dodgerblue", label="Raw ADC")
+    plt.plot(time, adc, 'x-', c="powderblue", label="Raw ADC", linewidth=1.5)
+    plt.plot(time_del, adc, 'x-', c="dodgerblue", label="Raw ADC + FIR delay", linewidth=1.5)
     
     for i in range(2*n_packets+2):
         plt.axvline(x=-n_packets*pkt_len_ts+i*pkt_len_ts, linestyle="--", c="k", alpha=0.2)
     
     # 
     plt.axvspan(time_start*tick_per_sample, time_end*tick_per_sample, alpha=0.1, color='red')
-    plt.axvspan((time_start-fir_delay)*tick_per_sample, (time_end-15)*tick_per_sample, alpha=0.3, color='red')
+    # plt.axvspan((time_start-fir_delay)*tick_per_sample, (time_end-15)*tick_per_sample, alpha=0.3, color='red')
     plt.axvline(x=time_peak*tick_per_sample, linestyle="-", c="k", alpha=0.3)
-    plt.axvline(x=(time_peak-fir_delay)*tick_per_sample, linestyle="-", c="k", alpha=0.6)
+    # plt.axvline(x=(time_peak-fir_delay)*tick_per_sample, linestyle="-", c="k", alpha=0.6)
     
     ax.hlines(y=fw_median, xmin=0, xmax=2048, linestyle="-.", colors="black", alpha=0.5, label="median")
     ax.hlines(y=fw_median+threshold*fir_correction, xmin=0, xmax=2048, linestyle="-.", colors="limegreen", alpha=0.5, label="median+threshold")
     
-    ax.text(0.035, 0.95, wave_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_wave, fontdict=mono)
-    ax.text(0.035, 0.175, tp_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_tp, fontdict=mono)
-    ax.text(0.60, 0.175, record_info, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props_record, fontdict=mono)
+    ax.text(0.02, 0.98, wave_info, transform=ax.transAxes, fontsize=8, va='top', bbox=props_wave, fontdict=mono)
+    ax.text(0.02, 0.02, tp_info, transform=ax.transAxes, fontsize=8, va='bottom', bbox=props_tp, fontdict=mono)
+    ax.text(0.98, 0.02, record_info, transform=ax.transAxes, fontsize=8, ha='right', va='bottom', bbox=props_record, fontdict=mono)
     
     plt.ylim(median+dy_min, median+dy_max)
     
@@ -135,9 +139,11 @@ def cli(rawdata_file, run, threshold,outpath):
     outpath = Path(outpath)
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveformas'+ rawdata_file.stem + '.pdf'))
 
+    n = 10
+    m = 150
     # 100 and 150 are kind of random pocks to sample the input file
-    for k in range(100):
-        idx = 150*k
+    for k in range(n):
+        idx = m*k
         rich.print(f"Plotting centered tp  {idx}")
         if idx > len(raw_fwtps_centered.index):
             break
@@ -147,8 +153,8 @@ def cli(rawdata_file, run, threshold,outpath):
     
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveformas'+ rawdata_file.stem + '.pdf'))
     raw_fwtps_edges = raw_fwtps[(raw_fwtps['hit_continue'] == 1) | (raw_fwtps['start_time'] == 0) | (raw_fwtps['end_time'] == 63)]
-    for k in range(100):
-        idx = 150*k
+    for k in range(n):
+        idx = m*k
         rich.print(f"Plotting edge tp  {idx}")
         if idx > len(raw_fwtps_edges.index):
             break

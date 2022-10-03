@@ -96,7 +96,7 @@ def find_boundaries(rdm, capture):
     capture.tp_file.ts_min, capture.tp_file.ts_max = rdm.find_tp_ts_minmax(capture.tp_file.name)
     for f in capture.adc_files:
         f.ts_min, f.ts_max = rdm.find_tpc_ts_minmax(f.name)
-    
+        
     # find the overlap region
     ts_min = max([capture.tp_file.ts_min]+[f.ts_min for f in capture.adc_files])
     ts_max = min([capture.tp_file.ts_max]+[f.ts_max for f in capture.adc_files])
@@ -252,8 +252,8 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
 
         for i, (ts_min, ts_max) in enumerate(ts_bins):
 
-            print("File {i} - ts ragnge (f{ts_min}-{ts_max})")
-            store = pd.HDFStore( outdir / capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5')
+            print(f"File {i} - ts range ({ts_min}-{ts_max})")
+            store = pd.HDFStore( outdir / (capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5'))
             print("Saving raw tps dataframe")
             rtp_df[ (rtp_df['ts'] >= ts_min) & ( rtp_df['ts'] < ts_max) ].to_hdf(store, 'raw_fwtps')
             print("Saving raw adcs dataframe")
