@@ -130,6 +130,7 @@ std::vector<FWTP> unpack_fwtps_2g(void *buf, size_t n_blocks, bool safe_mode){
     // i+3 corresponds to the offset of the last word of the trailer.
     for(; (i+3)<n_words; ++i) {
         // fmt::print("{:08d} 0x{:04x} 0x{:04x} 0x{:04x} 0x{:04x}\n", i, data[i],  data[i+1],  data[i+2],  data[i+3]);
+        // fmt::print("{:08d} 0x{:04x}\n", i, data[i]);
 
       if (
         data[i  ] == trl_marker_1 && 
