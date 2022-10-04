@@ -128,22 +128,25 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-r', '--run', type=int, default=1)
 @click.option('-t', '--threshold', type=int, default=100)
 @click.option('-o', '--outpath', type=click.Path(file_okay=False), default='.')
-def cli(rawdata_file, run, threshold,outpath):
+@click.option('-n', '--num-plots', type=int, default=10)
+@click.option('-s', '--step', type=int, default=150)
+def cli(rawdata_file, run, threshold,outpath, num_plots, step):
     
     rawdata_file = Path(rawdata_file)
     raw_fwtps = pd.read_hdf(rawdata_file, 'raw_fwtps')
     raw_adcs = pd.read_hdf(rawdata_file, 'raw_adcs')
+
+    rich.print(raw_fwtps)
+    rich.print(raw_adcs)
 
     raw_fwtps_centered = raw_fwtps[(raw_fwtps['hit_continue'] == 0) & (raw_fwtps['start_time'] != 0) & (raw_fwtps['end_time'] != 63)]
 
     outpath = Path(outpath)
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveformas'+ rawdata_file.stem + '.pdf'))
 
-    n = 10
-    m = 150
     # 100 and 150 are kind of random pocks to sample the input file
-    for k in range(n):
-        idx = m*k
+    for k in range(num_plots):
+        idx = step*k
         rich.print(f"Plotting centered tp  {idx}")
         if idx > len(raw_fwtps_centered.index):
             break
@@ -153,8 +156,8 @@ def cli(rawdata_file, run, threshold,outpath):
     
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveformas'+ rawdata_file.stem + '.pdf'))
     raw_fwtps_edges = raw_fwtps[(raw_fwtps['hit_continue'] == 1) | (raw_fwtps['start_time'] == 0) | (raw_fwtps['end_time'] == 63)]
-    for k in range(n):
-        idx = m*k
+    for k in range(num_plots):
+        idx = step*k
         rich.print(f"Plotting edge tp  {idx}")
         if idx > len(raw_fwtps_edges.index):
             break

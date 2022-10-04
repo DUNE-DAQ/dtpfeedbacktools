@@ -152,8 +152,7 @@ def scan_tp_ts_offsets(tp_file, n_samples = 128):
 
         blk = rfr.read_block(n_bytes, offset)
 
-        fwtps = dtpfeedbacktools.unpack_fwtps_to_arrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
-
+        fwtps = dtpfeedbacktools.unpack_fwtps_to_nparrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
         ts = min(fwtps['ts']) if i != n_samples else min(fwtps['ts'])
 
         ts_offsets.append((ts, offset))
@@ -214,6 +213,31 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
 
         capture_print(c)
 
+
+        # Load TPs
+
+        # Calculate the list of ts/byte-offsets with large granularity
+        ts_offsets = scan_tp_ts_offsets(Path(rdm.data_path) / c.tp_file.name, 8192)
+
+        #
+        ts_offset_min = next(iter(i for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_min <  ts_offsets[i+1][0]), None)
+        ts_offset_max = next(iter(i+1 for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_max <  ts_offsets[i+1][0]), None)
+
+        # print(ts_offset_min, ts_offset_max)
+
+        rtp_df = rdm.load_tps(
+            c.tp_file.name,
+            n_tpblocks=(ts_offsets[ts_offset_max][1]-ts_offsets[ts_offset_min][1])//tp_block_bytes,
+            offset=ts_offsets[ts_offset_min][1]//tp_block_bytes, 
+        )
+
+        # trim
+        rtp_df = rtp_df[(rtp_df["ts"] > c.ts_overlap_min) & (rtp_df["ts"] < c.ts_overlap_max) ]
+
+        # Load ADCs
+        if c.ts_overlap_max is None or c.ts_overlap_min is None:
+            rich.print(f"Warning: no overlap detected for {c}. Skipping")
+            continue;
         radc_dfs = []
         for f in c.adc_files:
             df = rdm.load_tpcs(
@@ -225,25 +249,6 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
             radc_dfs.append(df)
 
         radc_df = pd.concat(radc_dfs, axis=1)
-
-
-        # Calculate the list of ts/byte-offsets with large granularity
-        ts_offsets = scan_tp_ts_offsets(Path(rdm.data_path) / c.tp_file.name, 8192)
-
-        #
-        ts_offset_min = next(iter(i for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_min <  ts_offsets[i+1][0]), None)
-        ts_offset_max = next(iter(i+1 for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_max <  ts_offsets[i+1][0]), None)
-
-        print(ts_offset_min, ts_offset_max)
-
-        rtp_df = rdm.load_tps(
-            c.tp_file.name,
-            n_tpblocks=(ts_offsets[ts_offset_max][1]-ts_offsets[ts_offset_min][1])//tp_block_bytes,
-            offset=ts_offsets[ts_offset_min][1]//tp_block_bytes, 
-        )
-
-        # trim
-        rtp_df = rtp_df[(rtp_df["ts"] > c.ts_overlap_min) & (rtp_df["ts"] < c.ts_overlap_max) ]
 
         # Calculate splitting intervals
         n_bins = split_factor

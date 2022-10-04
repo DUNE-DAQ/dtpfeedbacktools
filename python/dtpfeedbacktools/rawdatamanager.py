@@ -200,10 +200,8 @@ class RawDataManager:
         first_ts = self.blk_unpack.np_array_timestamp_data(first_blk.as_capsule(), n_frames)[0]
         last_ts = self.blk_unpack.np_array_timestamp_data(last_blk.as_capsule(), n_frames)[-1]
         
-        rich.print((last_ts-first_ts)//32*wib_frame_bytes, rfr.get_size())
-
         if (last_ts-first_ts)//wib_sample_in_ts*wib_frame_bytes > rfr.get_size():
-            print("AAAAAA")
+            print("[yellow]WARNING: ")
             n_points = 100
             prev_ts = 0
             # Switch to scanning
@@ -214,7 +212,7 @@ class RawDataManager:
                 if prev_ts != 0 and (ts-prev_ts) != frame_step * wib_sample_in_ts:
                     last_ts = prev_ts
                     break
-                print(offset, ts, ts-first_ts, last_ts-ts, ts-prev_ts)
+                # print(offset, ts, ts-first_ts, last_ts-ts, ts-prev_ts)
                 prev_ts = ts
 
 

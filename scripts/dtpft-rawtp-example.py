@@ -63,7 +63,7 @@ def unpack_entire_file(rfr):
 
 
     rprint(f"Unpacking {n_tpblocks}")
-    fwtps = dtpfeedbacktools.unpack_fwtps_to_arrays(blk.as_capsule(), n_tpblocks)
+    fwtps = dtpfeedbacktools.unpack_fwtps_to_nparrays(blk.as_capsule(), n_tpblocks)
 
     rprint(f"Building dataframe")
 
@@ -116,7 +116,7 @@ def scan_ts(rfr):
 
         blk = rfr.read_block(n_bytes, offset)
 
-        fwtps = dtpfeedbacktools.unpack_fwtps_to_arrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
+        fwtps = dtpfeedbacktools.unpack_fwtps_to_nparrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
 
         rtp_df = pd.DataFrame(fwtps)
 
