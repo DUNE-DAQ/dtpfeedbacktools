@@ -20,7 +20,9 @@ std::vector<FWTP> check_fwtps(void *buf, size_t n_blocks, bool safe_mode){
 
 
 //-----------------------------------------------------------------------------
-std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode){
+/* First implementation of FWTPs unpacker
+*/
+std::vector<FWTP> unpack_fwtps_leg(void *buf, size_t n_blocks, bool safe_mode){
 
     constexpr uint16_t trl_magic_1 = 0xf00d;
     constexpr uint16_t trl_magic_2 = 0xfeed;
@@ -105,7 +107,7 @@ std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode){
 
 
 //-----------------------------------------------------------------------------
-std::vector<FWTP> unpack_fwtps_2g(void *buf, size_t n_blocks, bool safe_mode){
+std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode){
 
     std::vector<FWTP> fwtps;
     fwtps.reserve(n_blocks/3);

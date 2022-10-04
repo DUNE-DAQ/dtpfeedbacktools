@@ -105,7 +105,7 @@ py::dict fwtps_to_nparrays(const std::vector<FWTP>& v) {
 
 py::dict unpack_fwtps_to_nparrays(void *buf, size_t n_blocks, bool safe_mode=true) {
 
-    auto fwtps = unpack_fwtps_2g(buf, n_blocks, safe_mode);
+    auto fwtps = unpack_fwtps(buf, n_blocks, safe_mode);
     return fwtps_to_nparrays(fwtps);
 }
 
@@ -177,7 +177,7 @@ PYBIND11_MODULE(_daq_dtpfeedbacktools_py, m)
     ;
 
   m.def("check_fwtps", &check_fwtps, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
-  m.def("unpack_fwtps", &unpack_fwtps_2g, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
+  m.def("unpack_fwtps", &unpack_fwtps, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
   m.def("fwtps_to_nparrays", &fwtps_to_nparrays);
   m.def("unpack_fwtps_to_nparrays", &unpack_fwtps_to_nparrays, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
 

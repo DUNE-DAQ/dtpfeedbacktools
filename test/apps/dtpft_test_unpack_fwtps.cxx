@@ -35,7 +35,7 @@ int main(int argc, char const *argv[])
 
     fmt::print("Block size : {}\n", blk->size());
     // auto fwtp_vector = unpack_fwtps(blk->data(), blk->size()/24);
-    auto fwtp_vector = unpack_fwtps_2g(blk->data(), blk->size()/12);
+    auto fwtp_vector = unpack_fwtps(blk->data(), blk->size()/12);
     fmt::print("Unpacked {} TPs\n", fwtp_vector.size());
     return 0;
 }

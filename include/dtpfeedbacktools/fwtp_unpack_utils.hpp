@@ -15,8 +15,8 @@ std::vector<FWTP> check_fwtps(void *buf, size_t n_blocks, bool safe_mode=true);
 /**
  *
  **/
-// std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode=true);
-std::vector<FWTP> unpack_fwtps_2g(void *buf, size_t n_blocks, bool safe_mode=true);
+// std::vector<FWTP> unpack_fwtps_leg(void *buf, size_t n_blocks, bool safe_mode=true);
+std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode=true);
 
 
 } // namespace dtpfeedbacktools
