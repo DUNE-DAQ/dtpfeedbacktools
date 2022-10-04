@@ -82,7 +82,7 @@ def cli(file_path: str, interactive: bool, frame_type: str = 'WIB', map_id: str 
             adc = adc_data.values
             time = adc_data.index.astype(int) - time_peak
 
-            rms_adc = rms(adc)
+            #rms_adc = rms(adc)
             mu = tpc_df[channel].mean()
             median = tpc_df[channel].median()
             sigma = tpc_df[channel].std()

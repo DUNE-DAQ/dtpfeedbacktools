@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.command.install_egg_info import safe_name
+# from distutils.command.install_egg_info import safe_name
 from rich import print as rprint
 
 import rich
