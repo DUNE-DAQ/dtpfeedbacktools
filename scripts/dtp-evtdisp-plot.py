@@ -58,7 +58,7 @@ def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
     
     #Overlay the 2d hits
     hits = ax2.scatter((df_tp['peak_time'] - fir_delay + (df_tp['ts'] -t0)/ticks_per_sample), y.values,
-                       c = df_tp['hit_continue'], s = 15, label = 'firmware hits', alpha  =0.6, cmap = cmap)
+                       c = df_tp['hit_continue'], s = 15, marker = 's', label = 'firmware hits', alpha  =0.6, cmap = cmap)
     cb1 = plt.colorbar(im, ax = ax1, shrink = 0.7)
     cb1.set_label("ADC ", rotation = 270, labelpad = +20)
     cb2 = plt.colorbar(hits, ax = ax2, ticks = [0.25,0.75], shrink =  0.7)
