@@ -33,6 +33,7 @@ dtp-fwtp-plots.py <FILES_PATH> -f <frame_type> -m <map_id> -t <threshold> -n <n_
 dtp-tr-plots.py <FILES_PATH> -f <frame_type> -m <map_id> -t <threshold> -n <n_plots> -o <out_path> --interactive
 ```
 
+
 **dtp-evt-disp-plot**
 *2D raw data event display with overlaid, color-coded, firmware hits* 
 
