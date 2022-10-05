@@ -40,7 +40,8 @@ def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
 
     y=df_tp['offline_ch'].map(lambda k: y_vals.index(k))
 
-    yloc = [i for i in range(1,len(df_adc.columns),32)]
+    n_yticks = 8 #number of ticks to plot of y-axis regardless of n_channels
+    yloc  = [i for i in range(1, len(df_adc.columns), int(len(df_adc.columns)/n_yticks))]   
     yticks = [str(df_adc.columns[i]) for i in yloc]
 
 
