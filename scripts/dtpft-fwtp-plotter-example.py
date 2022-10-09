@@ -50,16 +50,24 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, emul
     tp_data['ts'] = tp_data['ts']-tstamp
     # rich.print(tp_data)
     n_tps = tp_data.shape[0]
-    adc_data = raw_adcs.loc[ts_min:ts_max, channel]
+    adc_data = raw_adcs.loc[ts_min:ts_max-tick_per_sample, channel]
     adc = adc_data.values
     time = adc_data.index.astype(int) - tstamp
     time_del = adc_data.index.astype(int) - tstamp + fir_delay*tick_per_sample
 
-    tpgm = TPGManager(1000, "data/fir_coeffs.dat", 6, 1500)
-    pedsub_df, pedval_df, accum_df = tpgm.pedestal_subtraction(raw_adcs.loc[(ts_min-2*fir_delay*tick_per_sample):ts_max], channel, pedchan=True)
-    fir_df = tpgm.fir_filter(pedsub_df, channel)
+    tpgm = TPGManager(1000, "data/fir_coeffs.dat", 6, threshold, "HDColdbox")
+    fir_data = raw_adcs.loc[(ts_min-64*tick_per_sample):ts_max-tick_per_sample]
+    tp_df, ped_df, pedval_df, fir_df = tpgm.run_channel(fir_data, channel, pedchan=True, ped_debug=True)
+    tp_df['ts'] = tp_df['ts']-tstamp
+
     fir_adc = fir_df.values
     time_fir = fir_df.index.astype(int) - tstamp
+
+    #import IPython
+    #IPython.embed()
+
+    tp_join = pd.concat([tp_data, tp_df],join='outer', axis=0, ignore_index=True)
+    rich.print(tp_join)
     
     sum_fir = fir_df.loc[fir_df[channel]>threshold].sum()
 
@@ -85,9 +93,10 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, emul
 
     fig = plt.figure()
     gs = fig.add_gridspec(1, 3)
+
+    # plt.style.use('"cyberpunk"')
+    plt.style.use('seaborn-whitegrid')
     
-    plt.style.use('ggplot')
-    # plt.style.use('seaborn-v0_8-whitegrid')
     with plt.style.context('default'):
         ax = fig.add_subplot(gs[0,2])
         ax.axis('off')
@@ -99,14 +108,14 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, emul
     
     props_record = dict(boxstyle='square', facecolor='white', alpha=1)
     props_tp = dict(boxstyle='square', facecolor='lightcoral', alpha=0.75)
-    props_fir = dict(boxstyle='square', facecolor='lawngreen', alpha=0.6)
+    props_fir = dict(boxstyle='square', facecolor='darkred', alpha=0.6)
     props_wave = dict(boxstyle='square', facecolor='dodgerblue', alpha=0.6)
     mono = {'family' : 'monospace'}
 
     plt.plot(time, adc, 'x-', c="powderblue", label="Raw ADC", linewidth=1.5)
     plt.plot(time_del, adc, 'x-', c="dodgerblue", label="Raw ADC + FIR delay", linewidth=1.5)
     if emulation:
-        plt.plot(time_fir, fir_adc + pedval_df.values, 'x-', c="lawngreen", label="Emu FIR ADC", linewidth=1.5)
+        plt.plot(time_fir, fir_adc + pedval_df.values, 'x-', c="darkred", alpha=0.9, label="Emu FIR ADC", linewidth=1.5)
     
     for i in range(2*n_packets+2):
         plt.axvline(x=-n_packets*pkt_len_ts+i*pkt_len_ts, linestyle="--", c="k", alpha=0.2)
@@ -130,7 +139,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, emul
     ax.text(0.02, 0.02, tp_info, transform=ax.transAxes, fontsize=8, va='bottom', bbox=props_tp, fontdict=mono)
     ax.text(0.98, 0.02, record_info, transform=ax.transAxes, fontsize=8, ha='right', va='bottom', bbox=props_record, fontdict=mono)
     
-    plt.xlim(-n_packets*pkt_len_ts, -n_packets*pkt_len_ts+i*pkt_len_ts)
+    #plt.xlim(-n_packets*pkt_len_ts, -n_packets*pkt_len_ts+i*pkt_len_ts)
     plt.ylim(median+dy_min, median+dy_max)
     
     plt.xlabel("Relative time [ticks]", fontsize=12, labelpad=10, loc="right")
