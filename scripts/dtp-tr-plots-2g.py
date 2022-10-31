@@ -47,6 +47,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     adc_peak = rtp["peak_adc"]
     fw_median = rtp["median"]
     accumulator = rtp["accumulator"]
+    tp_number = rtp.name
     # if(adc_peak < 120): continue
 
     mu = raw_adcs[channel].mean()
@@ -58,6 +59,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     tp_data = rtp_df[(rtp_df['ts']>ts_min) & (rtp_df['ts']<=ts_max) & (rtp_df['offline_ch']==rtp['offline_ch'])]
     tp_data = tp_data.copy()
     tp_data['ts'] = tp_data['ts']-tstamp
+    n_tps = tp_data.shape[0]
     adc_data = raw_adcs.loc[ts_min:ts_max, channel]
     adc = adc_data.values
     time = adc_data.index.astype(int) - tstamp
@@ -82,8 +84,8 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     fig = plt.figure()
     gs = fig.add_gridspec(1, 3)
     
-    # plt.style.use('ggplot')
-    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.style.use('seaborn-v0_8-white')
+
     with plt.style.context('default'):
         ax = fig.add_subplot(gs[0,2])
         ax.axis('off')
@@ -97,16 +99,16 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     props_tp = dict(boxstyle='square', facecolor='lightcoral', alpha=0.75)
     props_wave = dict(boxstyle='square', facecolor='lightskyblue', alpha=1)
     mono = {'family' : 'monospace'}
-    plt.plot(time, adc, 'x-', c="powderblue", label="Raw ADC", linewidth=1.5)
-    plt.plot(time_del, adc, 'x-', c="dodgerblue", label="Raw ADC + FIR delay", linewidth=1.5)
+    #plt.plot(time, adc, 'x-', c="powderblue", label="Raw ADC", linewidth=1.5)
+    plt.plot(time_del, adc, 'x-', c="dodgerblue", label="Raw ADC", linewidth=1.5)
     
     for i in range(2*n_packets+2):
         plt.axvline(x=-n_packets*pkt_len_ts+i*pkt_len_ts, linestyle="--", c="k", alpha=0.2)
     
     # 
-    plt.axvspan(time_start*tick_per_sample, time_end*tick_per_sample, alpha=0.3, color='red')
+    plt.axvspan(time_start*tick_per_sample, time_end*tick_per_sample, alpha=0.3, color='red', linewidth=0)
     plt.axvline(x=time_peak*tick_per_sample, linestyle="-", c="k", alpha=0.3)
-    
+
     ax.hlines(y=fw_median, xmin=0, xmax=2048, linestyle="-.", colors="black", alpha=0.5, label="median")
     ax.hlines(y=fw_median+threshold*fir_correction, xmin=0, xmax=2048, linestyle="-.", colors="limegreen", alpha=0.5, label="median+threshold")
     
@@ -114,6 +116,12 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     ax.text(0.02, 0.02, tp_info, transform=ax.transAxes, fontsize=8, va='bottom', bbox=props_tp, fontdict=mono)
     ax.text(0.98, 0.02, record_info, transform=ax.transAxes, fontsize=8, ha='right', va='bottom', bbox=props_record, fontdict=mono)
     
+    for j in range(n_tps):
+        tp_no = tp_data.index[j]
+        if(tp_no == tp_number): continue
+        plt.axvspan(tp_data["ts"][tp_no]+tp_data["start_time"][tp_no]*tick_per_sample, tp_data["ts"][tp_no]+tp_data["end_time"][tp_no]*tick_per_sample, alpha=0.3, color='lightpink', linewidth=0)
+        plt.axvline(x=tp_data["ts"][tp_no]+tp_data["peak_time"][tp_no]*tick_per_sample, linestyle=":", linewidth=1, c="k", alpha=0.2)
+
     plt.ylim(median+dy_min, median+dy_max)
     
     plt.xlabel("Relative time [ticks]", fontsize=12, labelpad=10, loc="right")
@@ -131,43 +139,66 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     plt.close()
 
 #------------------------------------------------------------------------------
-def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
+def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, stitch = False, pdf = None):
+
+    rich.print("df_tp", df_tp)
 
     fir_delay = 16
-    cmap = cm.get_cmap('bwr',2) #cmap for hit_continue param. 
+    ticks_per_sample = 32
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ["lawngreen","black"])
+    #cmap = cm.get_cmap('copper',2) #cmap for hit_continue param. 
     norm = colors.LogNorm() # cmap for raw adc data
+    # timestamp for the beginning of data capture that t will be plotted relative to
+    t0 = df_adc.index[0]
     
     #Prepare data for plotting 
-    chan = pd.to_numeric(df_adc.columns[1:]) 
     df_adc = df_adc.head(ntsamples) # only plot user-specified number of samples 
     Z = df_adc.to_numpy()[:,1:]
 
     #quick cheated pedsub
     if zeroped:
         Z = Z - np.mean(Z, axis = 0)
-        norm = colors.TwoSlopeNorm(vmin=np.min(Z), vcenter=0, vmax=np.max(Z)) #update cmap so it's centered at 0.
+        #update cmap so it's centered at 0.
+        norm = colors.TwoSlopeNorm(vmin=np.min(Z), vcenter=0, vmax=np.max(Z))
 
 
-    #2D plot of the raw ADC data
-    plt.imshow(Z.T, cmap = 'RdBu_r',aspect = 'auto', origin = 'lower', norm = norm,
-               extent = [ min(df_adc.index),max(df_adc.index), min(chan), max(chan) ] )
-    # Overlay the FW hits 
+    #convert the ylabels to account for channels not being consecutive     
+    y_vals = df_adc.columns.to_list()[0:]; y_vals = [int(i) for i in y_vals]
 
-    if 'peak_time' in df_tp.columns:
-        plt.scatter(df_tp['peak_time']*32 - fir_delay + df_tp['ts'], df_tp['offline_ch'],  c = df_tp['hit_continue'],
-                    s = 16, label = 'firmware hits', alpha  =0.9, cmap = cmap)
-    else:
-        plt.scatter(df_tp['time_peak'], df_tp['channel'],
-                    s = 16, label = 'stiched hits', alpha =0.9)
-
-    # print( min(df_adc.index),max(df_adc.index), min(chan), max(chan) )
-    plt.ylabel('offline channel number')
-    plt.xlabel('timestamp [tick]')
-    plt.legend(title = "run number: %.0f" %run)
-    cb = plt.colorbar(ticks = [0.25,0.75], shrink =  0.7)
-    cb.ax.set_yticklabels(['0','1'])
-    cb.set_label("hit_continue", rotation = 270)
+    y=df_tp['offline_ch'].map(lambda k: y_vals.index(k))
     
+    yloc  = [i for i in range(1, len(df_adc.columns), int(len(df_adc.columns)/8))]
+    yticks = [str(df_adc.columns[i]) for i in yloc]
+
+
+
+    #Plot the data
+    fig, (ax1, ax2) = plt.subplots(2, sharex= True, figsize = (15,10))
+
+    for i in [ax1, ax2]:
+        im = i.imshow(Z.T, cmap = 'coolwarm',aspect = 'auto', origin = 'lower', norm = norm)
+        i.set_ylabel('offline channel number')
+        #i.set_xlim(4600, 4800)
+        i.set_yticks(yloc, yticks )
+        i.set_ylim(yloc[0],(yloc[-1]))
+    
+    if stitch:
+        x = df_tp['peak_time'] - fir_delay
+    else:
+        x = df_tp['peak_time'] - fir_delay + (df_tp['ts'] -t0)/ticks_per_sample
+
+    hits = ax2.scatter(x.values, y.values,
+                       c = df_tp['hit_continue'], s = 100, label = 'firmware hits',
+                       alpha = 1, edgecolors=None, linewidths=0, cmap = cmap)
+    cb1 = plt.colorbar(im, ax = ax1, shrink = 0.7)
+    cb1.set_label("ADC ", rotation = 270, labelpad = +20)
+    cb2 = plt.colorbar(hits, ax = ax2, ticks = [0.25,0.75], shrink =  0.7)
+    cb2.ax.set_yticklabels(['0','1'])
+    cb2.set_label('hit_continue ', rotation = 270, labelpad = +20)
+    ax2.set_xlabel('relative time [tick]')
+    plt.legend(title = "run number: %.0f" %run)
+    plt.tight_layout()
+
     if pdf: pdf.savefig()
     plt.show()
     plt.close()
@@ -208,46 +239,86 @@ def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, map_id
     # rich.print(trl)
     if tr_num not in trl:
         raise IndexError(f"{tr_num} does not exists!");
+
     en_info, tpc_df, tp_df, fwtp_df = rdm.load_entry(file_path, trl[0])
-    
+    rich.print(fwtp_df)
+
+    """
+    fwtp_list = []
+    tpc_list  = []
+    for tr in trl:
+        en_info, tpc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr)
+        fwtp_list.append(fwtp_df)
+        tpc_list.append(tpc_df)
+    fwtp_df = pd.concat(fwtp_list)
+    tpc_df  = pd.concat(tpc_list)
+    """
+
     run = en_info['run_number']
+
+    if interactive:
+        import IPython
+        IPython.embed(colors="neutral")
+
+    plt.rcParams['figure.figsize'] = [12., 5.]
+    plt.rcParams['figure.dpi'] = 75
+
+    """
+    crazy_tps = fwtp_df.loc[fwtp_df["peak_adc"]>15000]
+
+
+
+    outpath = Path(outpath)
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('Crazy_fwtp_'+ dp.stem + '.pdf'))
+    for k in range(num_waves):
+        idx = step*k
+        rich.print(f"Plotting funky tp  {idx}")
+        if idx > len(crazy_tps.index):
+            break
+        plotme_a_fwtp(crazy_tps.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
+    pdf.close()
+    """
+
+
+    rich.print(tp_df.columns)
 
     outpath = Path(outpath)
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('TRDisplay_fwtp_'+ dp.stem + '.pdf'))
-    plotme_an_ED( tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
+    plotme_an_ED( tpc_df, fwtp_df, run, len(tpc_df), True, stitch = False, pdf = pdf)
     pdf.close()
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('TRDisplay_tp_'+ dp.stem + '.pdf'))
-    plotme_an_ED( tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
+    plotme_an_ED( tpc_df, tp_df, run, len(tpc_df), True, stitch = True, pdf = pdf)
     pdf.close()
-    # fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 
-    # outpath = Path(outpath)
+    fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 
-    # plt.rcParams['figure.figsize'] = [12., 5.]
-    # plt.rcParams['figure.dpi'] = 75
-    # pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveformas'+ dp.stem + '.pdf'))
+    outpath = Path(outpath)
+
+    plt.rcParams['figure.figsize'] = [12., 5.]
+    plt.rcParams['figure.dpi'] = 75
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveforms_'+ dp.stem + '.pdf'))
 
     # # 100 and 150 are kind of random pocks to sample the input file
-    # for k in range(num_waves):
-    #     idx = step*k
-    #     rich.print(f"Plotting centered tp  {idx}")
-    #     if idx > len(fwtp_df_centered.index):
-    #         break
-    #     plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
+    for k in range(num_waves):
+        idx = step*k
+        rich.print(f"Plotting centered tp  {idx}")
+        if idx > len(fwtp_df_centered.index):
+            break
+        plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
   
-    # pdf.close()
+    pdf.close()
     
-    # pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveformas'+ dp.stem + '.pdf'))
-    # fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
-    # for k in range(num_waves):
-    #     idx = step*k
-    #     rich.print(f"Plotting edge tp  {idx}")
-    #     if idx > len(fwtp_df_edges.index):
-    #         break
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveforms_'+ dp.stem + '.pdf'))
+    fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
+    for k in range(num_waves):
+        idx = step*k
+        rich.print(f"Plotting edge tp  {idx}")
+        if idx > len(fwtp_df_edges.index):
+            break
 
-    #     plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
-    # pdf.close()
+        plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
+    pdf.close()
 
 
 
