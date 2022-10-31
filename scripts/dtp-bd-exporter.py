@@ -12,7 +12,7 @@ import itertools
 import pandas as pd
 
 import dtpfeedbacktools
-from dtpfeedbacktools.rawdatamanager import RawDataManager
+from dtpfeedbacktools.rawdatamanager import RawDataManager, RawCaptureDetails, RawFileInfo
 
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
@@ -26,27 +26,6 @@ NS_PER_TICK = 16
 TS_CLK_FREQ=62.5e6
 tp_block_size = 3
 tp_block_bytes = tp_block_size*4
-
-class RawCaptureDetails:
-    '''Holds list of capture files that form a capture group'''
-    def __init__(self):
-        self.tp_file = None
-        self.adc_files = []
-        self.ts_overlap_min = None
-        self.ts_overlap_max = None
-    
-    def __repr__(self):
-        return f"RawCaptureDetails({self.tp_file.link_id}, {[i.link_id for i in self.adc_files]})"
-
-class RawFileInfo:
-    '''Details of a raw data capture file'''
-    def __init__(self, name, link_id):
-        self.name = name
-        self.link_id = link_id
-        self.ts_min = None
-        self.ts_max = None
-        self.ts_offsets = None
-
 
 def get_capture_details(rdm : RawDataManager):
 
@@ -168,6 +147,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('files_path', type=click.Path(exists=True))
 @click.option('-i', '--interactive', is_flag=True, default=False)
+@click.option('--save', is_flag=True, default=False)
 @click.option('-m', '--map_id', type=click.Choice(
     [
         "VDColdbox",
@@ -186,7 +166,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-o', '--outdir', type=click.Path(), default=".")
 @click.option('-s', '--split-factor', type=int, default=5)
 
-def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str, split_factor: int) -> None:
+def cli(files_path, interactive: bool, save: bool, map_id: str, frame_type: str, outdir: str, split_factor: int) -> None:
 
     capture_path = Path(files_path)
     outdir = Path(outdir)
@@ -196,23 +176,15 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
     rdm = RawDataManager(str(capture_path), frame_type, map_id)
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
-    t = Table()
-    t.add_column("filename", style="green")
-    t.add_column("link #")
-    t.add_column("timestamp_min")
-    t.add_column("relative offset (timestamp ticks)")
-    t.add_column("capture length (timestamp ticks)")
-    t.add_column("capture length (s)")
-    t.add_column("overlap (s)")
-    
     captures = get_capture_details(rdm)
-
 
     for c in captures:
         find_boundaries(rdm, c)
 
         capture_print(c)
 
+        if not save:
+            continue
 
         # Load TPs
 

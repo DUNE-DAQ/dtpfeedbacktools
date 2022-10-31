@@ -309,3 +309,22 @@ class RawDataManager:
         
         return rtpc_df
 
+class RawCaptureDetails:
+    '''Holds list of capture files that form a capture group'''
+    def __init__(self):
+        self.tp_file = None
+        self.adc_files = []
+        self.ts_overlap_min = None
+        self.ts_overlap_max = None
+    
+    def __repr__(self):
+        return f"RawCaptureDetails({self.tp_file.link_id}, {[i.link_id for i in self.adc_files]})"
+
+class RawFileInfo:
+    '''Details of a raw data capture file'''
+    def __init__(self, name, link_id):
+        self.name = name
+        self.link_id = link_id
+        self.ts_min = None
+        self.ts_max = None
+        self.ts_offsets = None
