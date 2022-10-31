@@ -24,7 +24,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-i', '--interactive', is_flag=True, default=False)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
               help="Select input frame type", default='WIB')
-@click.option('-m', '--map-id', type=click.Choice(
+@click.option('-m', '--map_id', type=click.Choice(
     [
         "VDColdbox",
         "HDColdbox",
@@ -52,10 +52,12 @@ def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, map_id
     en_info, adc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr_num)
 
     store = pd.HDFStore( outpath / (dp.stem + f'_tr_{tr_num}.hdf5'))
+    print("Saving run info dataframe")
+    en_info.to_hdf(store, 'info')
     print("Saving raw tps dataframe")
     fwtp_df.to_hdf(store, 'raw_fwtps')
     print("Saving adcs dataframe")
-    adc_df.to_hdf(store, 'adcs')
+    adc_df.to_hdf(store, 'raw_adcs')
     print("Saving tp dataframe")
     tp_df.to_hdf(store, 'tps')
     store.close()

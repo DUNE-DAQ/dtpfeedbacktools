@@ -5,6 +5,7 @@ import sys
 import rich
 import logging
 import click
+import h5py
 from rich import print
 from pathlib import Path
 from pylab import cm
@@ -17,6 +18,11 @@ import matplotlib.ticker as ticker
 import matplotlib.backends.backend_pdf
 
 fir_shift = 15
+
+def get_key_list(file):
+    with h5py.File(file, "r") as f:
+        key_list = list(f.keys())
+    return key_list
 
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
@@ -273,6 +279,8 @@ def plotme_an_ED_v2(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
+@click.option('--input_type', type=click.Choice(["TR", "DF"]),
+              help="Select input type", default='TR')
 @click.option('-n', '--tr-num', type=int, default=1)
 @click.option('-i', '--interactive', is_flag=True, default=False)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
@@ -291,25 +299,38 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-s', '--step', type=int, default=150)
 @click.option('-o', '--outpath', help="Output path for plots", default=".")
 
-def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, map_id: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
+def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, map_id: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
 
     dp = Path(file_path)
+    tr_flag = False
 
-    rdm = DataManager(dp.parent, frame_type, map_id)
-    data_files = sorted(rdm.list_files(), reverse=True)
-    rich.print(data_files)
-    f = dp.name
-    rich.print(f)
-    trl = rdm.get_entry_list(f)
-    # rich.print(trl)
-    if tr_num not in trl:
-        raise IndexError(f"{tr_num} does not exists!");
-    en_info, tpc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr_num)
+    if input_type == "TR":
+        tr_flag = True
+        rdm = DataManager(dp.parent, frame_type, map_id)
+        data_files = sorted(rdm.list_files(), reverse=True)
+        rich.print(data_files)
+        f = dp.name
+        rich.print(f)
+        trl = rdm.get_entry_list(f)
+        # rich.print(trl)
+        if tr_num not in trl:
+            raise IndexError(f"{tr_num} does not exists!");
+        en_info, tpc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr_num)
     
-    run = en_info['run_number']
+    elif input_type == "DF":
+        key_list = get_key_list(file_path)
 
-    rich.print(tp_df)
+        en_info = pd.read_hdf(file_path, key="info")
+        tpc_df  = pd.read_hdf(file_path, key="raw_adcs")
+        fwtp_df = pd.read_hdf(file_path, key="raw_fwtps")
+        if "tps" in key_list:
+            tr_flag = True
+            tp_df = pd.read_hdf(file_path, key="tps")
+
+    run = en_info['run_number'][0]
+
     rich.print(fwtp_df)
+    if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
@@ -317,9 +338,10 @@ def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, map_id
     plotme_an_ED_v2( tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
     pdf.close()
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
-    plotme_an_ED_v2( tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
-    pdf.close()
+    if tr_flag:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
+        plotme_an_ED_v2( tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
+        pdf.close()
 
     fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 

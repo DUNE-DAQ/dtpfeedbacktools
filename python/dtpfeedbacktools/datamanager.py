@@ -268,6 +268,7 @@ class DataManager:
             en_ts = 0
 
         print(en_info)
+        en_info = pd.DataFrame.from_dict(en_info, orient='index').T #just a trick to save the info into the hdf5 files
 
         # Sort source ides by subsystem
         # y = sorted(en_source_ids, key=lambda x: x.subsystem.name)

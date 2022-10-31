@@ -174,6 +174,8 @@ def cli(files_path, interactive: bool, save: bool, map_id: str, frame_type: str,
         raise click.Abort("f{captuure_path} is not a directory")
 
     rdm = RawDataManager(str(capture_path), frame_type, map_id)
+    en_info = {'run_number': rdm.get_run()}
+    en_info = pd.DataFrame.from_dict(en_info, orient='index').T  #just a trick to save the info into the hdf5 files
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
     captures = get_capture_details(rdm)
@@ -231,6 +233,8 @@ def cli(files_path, interactive: bool, save: bool, map_id: str, frame_type: str,
 
             print(f"File {i} - ts range ({ts_min}-{ts_max})")
             store = pd.HDFStore( outdir / (capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5'))
+            print("Saving run info dataframe")
+            en_info.to_hdf(store, 'info')
             print("Saving raw tps dataframe")
             rtp_df[ (rtp_df['ts'] >= ts_min) & ( rtp_df['ts'] < ts_max) ].to_hdf(store, 'raw_fwtps')
             print("Saving raw adcs dataframe")
