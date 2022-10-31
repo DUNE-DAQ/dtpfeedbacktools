@@ -310,7 +310,7 @@ class DataManager:
 
                 tpc_dfs.append(df)
 
-            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kSW_TriggerPrimitive:
+            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kTriggerPrimitive:
                 tp_size = detdataformats.trigger_primitive.TriggerPrimitive.sizeof()
                 n_frames = (frag.get_size()-frag_hdr.sizeof())//tp_size
                 logging.info(f"Subsys={sid.subsystem}, id={sid.id}: Number of TP frames: {n_frames}")
@@ -330,12 +330,12 @@ class DataManager:
                 fwtp_df = fwtp_list_to_df(fwtps, self.ch_map)
                 fwtp_dfs.append(fwtp_df)
 
-        tp_df = pd.DataFrame(tp_array, columns=['time_start', 'time_peak', 'time_over_threshold', 'channel', 'adc_integral', 'adc_peak', 'flag'])
+        tp_df = pd.DataFrame(tp_array, columns=['start_time', 'peak_time', 'time_over_threshold', 'offline_ch', 'sum_adc', 'peak_adc', 'flag'])
         
         if tpc_dfs:
             tpc_df = pd.concat(tpc_dfs, axis=1)
             # Sort columns (channels)
-            tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
+            #tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
         else:
             tpc_df = pd.DataFrame( columns=['ts'])
             tpc_df = tpc_df.set_index('ts')
