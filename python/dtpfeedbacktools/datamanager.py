@@ -240,15 +240,15 @@ class DataManager:
 
         if has_trs:
             logging.debug(f"Trigger Records detected!")
-            get_ehdr = rdf.get_trh
+            get_entry_hdr = rdf.get_trh
         elif has_tss:
             logging.debug(f"TimeSlices detected!")
-            get_ehdr = rdf.get_tsh
+            get_entry_hdr = rdf.get_tsh
 
         else:
             raise RuntimeError(f"No TriggerRecords nor TimeSlices found in {file_name}")
 
-        en_hdr = get_ehdr((entry,0))
+        en_hdr = get_entry_hdr((entry,0))
         en_source_ids = rdf.get_source_ids((entry, 0))
 
         if has_trs:
@@ -268,6 +268,17 @@ class DataManager:
             en_ts = 0
 
         print(en_info)
+
+        # Sort source ides by subsystem
+        # y = sorted(en_source_ids, key=lambda x: x.subsystem.name)
+        # it = itertools.groupby(y, lambda x: x.subsystem.name)
+        # z = { k:list(g) for k,g in it}
+        # Unpack detector first
+        # Create dataframe
+        # Process tps second
+        # Create dataframe
+        # Process fwtps last
+        # Create dataframe
 
         tpc_dfs = []
         fwtp_dfs = []
@@ -335,7 +346,7 @@ class DataManager:
         if tpc_dfs:
             tpc_df = pd.concat(tpc_dfs, axis=1)
             # Sort columns (channels)
-            #tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
+            # tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
         else:
             tpc_df = pd.DataFrame( columns=['ts'])
             tpc_df = tpc_df.set_index('ts')
