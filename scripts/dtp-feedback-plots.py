@@ -280,11 +280,13 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
-              help="Select input type", default='TR')
-@click.option('-n', '--tr-num', type=int, default=1)
-@click.option('-i', '--interactive', is_flag=True, default=False)
+              help="Select input file type", default='TR', show_default=True)
+@click.option('-n', '--tr-num', type=int,
+              help="Enter trigger number to plot", default=1, show_default=True)
+@click.option('-i', '--interactive', is_flag=True,
+              help="Run interactive mode", default=False, show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
-              help="Select input frame type", default='WIB')
+              help="Select input frame type", default='WIB', show_default=True)
 @click.option('-m', '--map_id', type=click.Choice(
     [
         "VDColdbox",
@@ -293,11 +295,14 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "PD2HD",
         "VST"
     ]),
-              help="Select input channel map", default='HDColdbox')
-@click.option('-t', '--threshold', type=int, default=100)
-@click.option('-w', '--num-waves', type=int, default=10)
-@click.option('-s', '--step', type=int, default=150)
-@click.option('-o', '--outpath', help="Output path for plots", default=".")
+              help="Select input channel map", default='HDColdbox', show_default=True)
+@click.option('-t', '--threshold', type=int,
+              help="Enter threshold used in run", default=100, show_default=True)
+@click.option('-w', '--num-waves', type=int,
+              help="Number of 1D waveforms to plot", default=10, show_default=True)
+@click.option('-s', '--step', type=int,
+              help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
+@click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
 
 def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, map_id: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
 
