@@ -83,7 +83,7 @@ whereas a DataFrame with TPs:
 
 The script also outputs four pdf files. The first two contain 2D event displays of the data from the corresponding trigger number
 
-![TRDisplay_fwtp_ex](https://cernbox.cern.ch/s/ZoYtGBHBiyXBnZn)
+![TRDisplay_fwtp_ex](https://cernbox.cern.ch/s/ruPhWWerYJpwLzw)
 
 ## Feedback from Binary Dumps
 
