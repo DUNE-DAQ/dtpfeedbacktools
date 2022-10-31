@@ -347,7 +347,7 @@ class DataManager:
         if tpc_dfs:
             tpc_df = pd.concat(tpc_dfs, axis=1)
             # Sort columns (channels)
-            # tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
+            tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
         else:
             tpc_df = pd.DataFrame( columns=['ts'])
             tpc_df = tpc_df.set_index('ts')

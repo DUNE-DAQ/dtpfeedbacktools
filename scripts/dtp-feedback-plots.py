@@ -227,10 +227,9 @@ def plotme_an_ED_v2(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
 
     y=df_tp['offline_ch'].map(lambda k: y_vals.index(k))
 
-    yloc = [i for i in range(1,len(df_adc.columns),32)]
+    n_yticks = 8 #number of ticks to plot of y-axis regardless of n_channels
+    yloc  = [i for i in range(1, len(df_adc.columns), int(len(df_adc.columns)/n_yticks))]   
     yticks = [str(df_adc.columns[i]) for i in yloc]
-
-
 
     #Plot the data
     fig, (ax1, ax2) = plt.subplots( 2, sharex= True, figsize = (15,10))
@@ -334,18 +333,19 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
 
     run = en_info['run_number'][0]
 
+    rich.print(tpc_df)
     rich.print(fwtp_df)
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
-    plotme_an_ED_v2( tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
+    plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
     pdf.close()
 
     if tr_flag:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
-        plotme_an_ED_v2( tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
+        plotme_an_ED_v2(tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
         pdf.close()
 
     fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
@@ -353,7 +353,7 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
     plt.rcParams['figure.figsize'] = [12., 5.]
     plt.rcParams['figure.dpi'] = 75
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveformas'+ dp.stem + '.pdf'))
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveforms_'+ dp.stem + '.pdf'))
     # 100 and 150 are kind of random pocks to sample the input file
     for k in range(num_waves):
         idx = step*k
@@ -364,7 +364,7 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
   
     pdf.close()
     
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveformas'+ dp.stem + '.pdf'))
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveforms_'+ dp.stem + '.pdf'))
     fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
     for k in range(num_waves):
         idx = step*k
