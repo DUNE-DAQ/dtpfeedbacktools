@@ -1,5 +1,11 @@
 # dtpfeedbacktools - Tools for DTP prompt feedback
 
+## Table of contents
+1. [Requirements](#requirements)
+2. [Feedback from Trigger Record files](#tr_plots)
+    1. [Exporting Trigger Record data](#tr_export)
+3. [Feedback from Binary Dumps](#bd)
+
 Simple package developed to validate the recorded data and firmware functioning. Data can be visualised and quality inspected almost instantaneously after capture. Some of the features it offers are:
 
 1. Quick measurement of usable overlap in data captures (binary dumps).
@@ -7,7 +13,7 @@ Simple package developed to validate the recorded data and firmware functioning.
 3. 2D event displays to check the overall quality of the capture.
 4. Possible emulation of the TPG block ([dtpemulator](https://github.com/DUNE-DAQ/dtpemulator)).
 
-## Requirements
+## Requirements <a name="requirements"></a>
 
 The current version of this package relies on `rc-dunedaq-v3.2.0-3`, please check this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) with the latest instructions on how to set up a development software area.
 
@@ -16,7 +22,7 @@ A set of particular Python packages are required to run these tools. Make sure t
 pip install -r requirements.txt
 ```
 
-## Feedback from Trigger Record files
+## Feedback from Trigger Record files <a name="tr_plots"></a>
 
 The main inputs for validation are currently Trigger Records (TRs). These contain the raw ADC data, firmware TPs and TPs. After a run is taken and the TRs are written one would like to run `dtp-feedback-plots.py`. To see the different inputs you can provide to it type:
 ```
@@ -97,7 +103,7 @@ whereas for the second we select FW TPs on the edges (either the start or the en
 
 Additionally, these figures include a table to the side with all the information of the FW TPs falling in the plotting window.
 
-### Exporting Trigger Record data
+### Exporting Trigger Record data <a name="tr_export"></a>
 
 When using the aforementioned script with a Trigger Record file it internally unpacks the data and formats it as different pandas DataFrames as a previous step before plotting. One also has the possibility of simply do the formatting and export the resulting DataFrames to various formats. To see the different options type:
 ```
@@ -138,4 +144,4 @@ Exporting the data to hdf5 (or csv) is useful for running the plotting scripts o
 dtp-feedback-plots.py <FILES_PATH> --input_type DF --tr-num <tr-num> --frame_type <frame_type> --map_id <map_id> --threshold <threshold> --num-waves <num-waves> --step <step> --output <out_path> --interactive
 ```
 
-## Feedback from Binary Dumps
+## Feedback from Binary Dumps <a name="bd"></a>
