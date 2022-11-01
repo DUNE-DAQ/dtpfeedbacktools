@@ -8,6 +8,9 @@ Simple package developed to validate the recorded data and firmware functioning.
 4. Possible emulation of the TPG block ([dtpemulator](https://github.com/DUNE-DAQ/dtpemulator)).
 
 ## Requirements
+
+The current version of this package relies on `rc-dunedaq-v3.2.0-3`, please check this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) with the latest instructions on how to set up a development software area.
+
 A set of particular Python packages are required to run these tools. Make sure to include them in your environment by running:
 ```
 pip install -r requirements.txt
@@ -15,7 +18,7 @@ pip install -r requirements.txt
 
 ## Feedback from Trigger Record files
 
-The main inputs for validation are currently Trigger Records (TRs). These contain the raw ADC data, firmware TPs and TPs. After a run is taken and the TRs are writen one would like to run `dtp-feedback-plots.py`. To see the different inputs you can provide to it type:
+The main inputs for validation are currently Trigger Records (TRs). These contain the raw ADC data, firmware TPs and TPs. After a run is taken and the TRs are written one would like to run `dtp-feedback-plots.py`. To see the different inputs you can provide to it type:
 ```
 dtp-feedback-plots.py --help
 ```
@@ -46,7 +49,7 @@ The usual way to run it when dealing with a TR file would be:
 dtp-feedback-plots.py <FILES_PATH> --input_type TR --tr-num <tr-num> --frame_type <frame_type> --map_id <map_id> --threshold <threshold> --num-waves <num-waves> --step <step> --output <out_path> --interactive
 ```
 
-This command will print in the terminal the pandas DataFrames containing the FW TPs and TPs from the especified trigger number. A typical DataFrame containing FW TPs should look like this:
+This command will print in the terminal the pandas DataFrames containing the FW TPs and TPs from the specified trigger number. A typical DataFrame containing FW TPs should look like this:
 ```
                      ts  offline_ch  crate_no  slot_no  fiber_no  wire_no  flags  median  accumulator  start_time  end_time  peak_time  peak_adc  hit_continue  tp_flags  sum_adc
 0    104174045922344937        6679         1        4         0      207      0    8946           -1           4        19         11     10056             0         0    40547
@@ -86,9 +89,53 @@ The script also outputs four pdf files. The first two contain 2D event displays 
 whereas one with TPs:
 ![TRDisplay_tp_ex](https://user-images.githubusercontent.com/73996651/199080057-b9940539-4ac3-405d-b254-33260a2012d0.png)
 
-The other two pdf files contain 1D plots with raw ADCs and the associated FW TPs
-![hit_center_waveform](https://user-images.githubusercontent.com/73996651/199191039-3ede06a4-c195-4961-9ebf-172591de9797.png)
+The other two pdf files contain 1D plots with raw ADCs and the associated FW TPs, including some general information about the FW TP (white box), a summary of hit quantities (red box) and some derived from the raw waveform (blue box). For the first file we show FW TPs located at the centre of the packet (i.e. not touching the edges):
 
+![hit_center_waveform](https://user-images.githubusercontent.com/73996651/199191039-3ede06a4-c195-4961-9ebf-172591de9797.png)
+whereas for the second we select FW TPs on the edges (either the start or the end of the packet):
 ![hit_edge_waveform](https://user-images.githubusercontent.com/73996651/199191213-5315d06b-de96-4752-bac3-495028057200.png)
+
+Additionally, these figures include a table to the side with all the information of the FW TPs falling in the plotting window.
+
+### Exporting Trigger Record data
+
+When using the aforementioned script with a Trigger Record file it internally unpacks the data and formats it as different pandas DataFrames as a previous step before plotting. One also has the possibility of simply do the formatting and export the resulting DataFrames to various formats. To see the different options type:
+```
+dtp-tr-exporter.py --help
+```
+which should return:
+```
+Usage: dtp-tr-exporter.py [OPTIONS] FILE_PATH
+
+Options:
+  -n, --tr-num INTEGER            Enter trigger number to export  [default: 1]
+  -i, --interactive               Run interactive mode  [default: False]
+  -f, --frame_type [ProtoWIB|WIB]
+                                  Select input frame type  [default: WIB]
+  -m, --map_id [VDColdbox|HDColdbox|ProtoDUNESP1|PD2HD|VST]
+                                  Select input channel map  [default:
+                                  HDColdbox]
+  --out_format [HDF5|CSV]         Select format of output  [default: HDF5]
+  -o, --out_path TEXT             Output path for plots  [default: .]
+  -h, --help                      Show this message and exit.
+```
+
+The normal use this script would be something like:
+```
+dtp-tr-exporter.py <FILES_PATH> --tr-num <tr-num> --frame_type <frame_type> --map_id <map_id> --out_format <out_format> --output <out_path> --interactive
+```
+
+Selecting as output format `HDF5` will create a single hdf5 file containing four pandas DataFrames:
+1. `info` contains information about the Trigger Record.
+2. `raw_fwtps` contains the FW TPs.
+3. `raw_adcs` contains the raw ADCs.
+4. `tps` contains the TPs.
+
+With the option `CSV` one gets four different csv files, with the same naming convention as the keys in the hdf5 files, containing the same data.
+
+Exporting the data to hdf5 (or csv) is useful for running the plotting scripts or to performing further analysis with it faster. Data in hdf5 files containing these DataFrames can also be used as input for the plotting script, just need to select the adequate option for input type:
+```
+dtp-feedback-plots.py <FILES_PATH> --input_type DF --tr-num <tr-num> --frame_type <frame_type> --map_id <map_id> --threshold <threshold> --num-waves <num-waves> --step <step> --output <out_path> --interactive
+```
 
 ## Feedback from Binary Dumps
