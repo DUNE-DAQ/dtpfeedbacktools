@@ -81,10 +81,14 @@ whereas a DataFrame with TPs:
 [1408 rows x 7 columns]
 ```
 
-The script also outputs four pdf files. The first two contain 2D event displays of the data from the corresponding trigger number
+The script also outputs four pdf files. The first two contain 2D event displays of the data from the corresponding trigger, with the upper panel showing the raw ADCs (with a fast pedestal subtraction applied) and the lower panel overlaying the position of either the FW TPs (distinguishing between hit continue 0 and 1)or the TPs. A normal TR display with FW TPs should look like this:
+![TRDisplay_fwtp_ex](https://user-images.githubusercontent.com/73996651/199078780-ac260b4e-d426-4096-b2cd-b6a06236372f.png)
+whereas one with TPs:
+![TRDisplay_tp_ex](https://user-images.githubusercontent.com/73996651/199080057-b9940539-4ac3-405d-b254-33260a2012d0.png)
 
-![TRDisplay_fwtp_ex](https://cernbox.cern.ch/s/ruPhWWerYJpwLzw)
+The other two pdf files contain 1D plots with raw ADCs and the associated FW TPs
+![hit_center_waveform](https://user-images.githubusercontent.com/73996651/199191039-3ede06a4-c195-4961-9ebf-172591de9797.png)
+
+![hit_edge_waveform](https://user-images.githubusercontent.com/73996651/199191213-5315d06b-de96-4752-bac3-495028057200.png)
 
 ## Feedback from Binary Dumps
-
-
