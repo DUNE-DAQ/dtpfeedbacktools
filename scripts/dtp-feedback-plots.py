@@ -72,8 +72,13 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     time = adc_data.index.astype(int) - tstamp
     time_del = adc_data.index.astype(int) - tstamp + fir_delay*tick_per_sample
 
-    y_min = min(adc) + dy_min
-    y_max = max(adc) + dy_max
+    try:
+        y_min = min(adc) + dy_min
+        y_max = max(adc) + dy_max
+    except:
+        rich.print("Something went wrong with the ADCs in this window!")
+        y_min = fw_median + dy_min
+        y_max = fw_median + dy_max
 
     wave_info = '\n'.join((
         f'{"mean = ":<7}{round(mu,2):>6}',
