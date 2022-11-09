@@ -269,7 +269,7 @@ class DataManager:
 
         print(en_info)
         en_info = pd.DataFrame.from_dict(en_info, orient='index').T #just a trick to save the info into the hdf5 files
-
+        en_info = en_info.set_index('trigger_number')
         # Sort source ides by subsystem
         # y = sorted(en_source_ids, key=lambda x: x.subsystem.name)
         # it = itertools.groupby(y, lambda x: x.subsystem.name)
@@ -355,6 +355,9 @@ class DataManager:
         if fwtp_dfs:
             fwtp_df = pd.concat(fwtp_dfs)
             fwtp_df = fwtp_df.sort_values(by=['ts'])
+            if not fwtp_df.empty:
+                fwtp_df['trigger_number'] = en_info.index.values[0]
+                fwtp_df = fwtp_df.astype({'trigger_number': int})
             # Sort columns (channels)
             # fwtp_df = fwtp_df.reindex(sorted(fwtp_df.columns), axis=1)
         else:

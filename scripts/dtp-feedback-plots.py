@@ -38,8 +38,8 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     tick_per_sample = 32
     fir_delay = 16
     n_packets = 1
-    dy_min = -800
-    dy_max = 9000
+    dy_min = -100
+    dy_max = +100
     pkt_len_ts = 32*64
     
     tstamp = rtp["ts"]
@@ -54,6 +54,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     fw_median = rtp["median"]
     accumulator = rtp["accumulator"]
     tp_number = rtp.name
+    trigger_number = rtp["trigger_number"]
     # if(adc_peak < 120): continue
 
     mu = raw_adcs[channel].mean()
@@ -71,6 +72,9 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     time = adc_data.index.astype(int) - tstamp
     time_del = adc_data.index.astype(int) - tstamp + fir_delay*tick_per_sample
 
+    y_min = min(adc) + dy_min
+    y_max = max(adc) + dy_max
+
     wave_info = '\n'.join((
         f'{"mean = ":<7}{round(mu,2):>6}',
         f'{"std = ":<7}{round(sigma,2):>6}')
@@ -84,6 +88,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
 
     record_info = '\n'.join((
         f'{"run number = ":<17}{run:>10}',
+        f'{"trigger number = ":<17}{trigger_number:>10}',
         f'{"channel = ":<17}{channel:>10}',
         f'{"tstamp = ":<9}{tstamp:>10}'))
 
@@ -128,7 +133,7 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
         plt.axvspan(tp_data["ts"][tp_no]+tp_data["start_time"][tp_no]*tick_per_sample, tp_data["ts"][tp_no]+tp_data["end_time"][tp_no]*tick_per_sample, alpha=0.3, color='lightpink', linewidth=0)
         plt.axvline(x=tp_data["ts"][tp_no]+tp_data["peak_time"][tp_no]*tick_per_sample, linestyle=":", linewidth=1, c="k", alpha=0.2)
 
-    plt.ylim(median+dy_min, median+dy_max)
+    plt.ylim(y_min, y_max)
     
     plt.xlabel("Relative time [ticks]", fontsize=12, labelpad=10, loc="right")
     
@@ -316,11 +321,23 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
         f = dp.name
         rich.print(f)
         trl = rdm.get_entry_list(f)
-        # rich.print(trl)
-        if tr_num not in trl:
-            raise IndexError(f"{tr_num} does not exists!");
-        en_info, tpc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr_num)
-    
+        rich.print(trl)
+        tr_load = trl if tr_num == -1 else [tr_num]
+        rich.print(tr_load)
+
+        #en_info, tpc_df, tp_df, fwtp_df = zip(*[rdm.load_entry(file_path, tr) if tr in trl else raise IndexError(f"{tr} does not exists!") for tr in tr_load])
+        entries = []
+        for tr in tr_load:
+            if tr not in trl:
+                raise IndexError(f"{tr} does not exists!")
+            try:
+                entries.append(rdm.load_entry(file_path, tr))
+            except:
+                rich.print(f"Error when trying to open record {tr}!")
+                pass
+        en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
+        fwtp_df = fwtp_df.astype({'trigger_number': int})
+
     elif input_type == "DF":
         key_list = get_key_list(file_path)
 
@@ -331,49 +348,53 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
             tr_flag = True
             tp_df = pd.read_hdf(file_path, key="tps")
 
-    run = en_info['run_number'][0]
+    run = en_info['run_number'][1]
 
+    rich.print(en_info)
     rich.print(tpc_df)
     rich.print(fwtp_df)
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
-    plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
-    pdf.close()
+    if tr_num != -1:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
+        plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
+        pdf.close()
 
-    if tr_flag:
+    if tr_flag and not tp_df.empty and tr_num != -1:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
         plotme_an_ED_v2(tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
         pdf.close()
 
-    fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 
-    plt.rcParams['figure.figsize'] = [12., 5.]
-    plt.rcParams['figure.dpi'] = 75
+    if not fwtp_df.empty:
+        fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveforms_'+ dp.stem + '.pdf'))
-    # 100 and 150 are kind of random pocks to sample the input file
-    for k in range(num_waves):
-        idx = step*k
-        rich.print(f"Plotting centered tp  {idx}")
-        if idx > len(fwtp_df_centered.index):
-            break
-        plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
-  
-    pdf.close()
+        plt.rcParams['figure.figsize'] = [12., 5.]
+        plt.rcParams['figure.dpi'] = 75
+
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_centered_waveforms_'+ dp.stem + '.pdf'))
+        # 100 and 150 are kind of random pocks to sample the input file
+        for k in range(num_waves):
+            idx = step*k
+            rich.print(f"Plotting centered tp  {idx}")
+            if idx > len(fwtp_df_centered.index):
+                break
+            plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
     
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveforms_'+ dp.stem + '.pdf'))
-    fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
-    for k in range(num_waves):
-        idx = step*k
-        rich.print(f"Plotting edge tp  {idx}")
-        if idx > len(fwtp_df_edges.index):
-            break
+        pdf.close()
+        
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveforms_'+ dp.stem + '.pdf'))
+        fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
+        for k in range(num_waves):
+            idx = step*k
+            rich.print(f"Plotting edge tp  {idx}")
+            if idx > len(fwtp_df_edges.index):
+                break
 
-        plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
-    pdf.close()
+            plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
+        pdf.close()
 
     if interactive:
         import IPython
@@ -382,11 +403,21 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
 if __name__ == "__main__":
     from rich.logging import RichHandler
 
+    """
     logging.basicConfig(
-       level="INFO",
+        level="INFO",
         format="%(message)s",
         datefmt="[%X]",
         handlers=[RichHandler(rich_tracebacks=True)]
+    )
+    """
+
+    logging.basicConfig(
+        filename="log.txt",
+        filemode="w",
+        level="DEBUG",
+        format="%(message)s",
+        datefmt="[%X]"
     )
 
     cli()
