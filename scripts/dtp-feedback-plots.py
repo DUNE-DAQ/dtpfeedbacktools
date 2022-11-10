@@ -353,7 +353,7 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
             tr_flag = True
             tp_df = pd.read_hdf(file_path, key="tps")
 
-    run = en_info['run_number'][1]
+    run = en_info.iloc[0].run_number
 
     rich.print(en_info)
     rich.print(tpc_df)
