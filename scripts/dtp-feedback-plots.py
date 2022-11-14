@@ -292,8 +292,10 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
-@click.option('-n', '--tr-num', type=int,
-              help="Enter trigger number to plot", default=1, show_default=True)
+#@click.option('-n', '--tr-num', type=int,
+#              help="Enter trigger number to plot", default=1, show_default=True)
+@click.option('-n', '--tr-num',
+              help="Enter trigger numbers to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these")
 @click.option('-i', '--interactive', is_flag=True,
               help="Run interactive mode", default=False, show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
@@ -322,7 +324,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -343,6 +345,17 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
     dp = Path(file_path)
     tr_flag = False
 
+    tr_list = list(tr_num.split(','))
+    tr_num = []
+    for tr in tr_list:
+        if ":" in tr:
+            tr_first, tr_last = map(int, tr.split(':'))
+            tr_num.extend([*range(tr_first, tr_last+1)])
+        else:
+            tr_num.append(int(tr))
+
+    rich.print(f'Triggers to extract: {tr_num}')
+
     if input_type == "TR":
         tr_flag = True
         rdm = DataManager(dp.parent, frame_type, channel_map_name)
@@ -352,8 +365,8 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
         rich.print(f)
         trl = rdm.get_entry_list(f)
         rich.print(trl)
-        tr_load = trl if tr_num == -1 else [tr_num]
-        rich.print(tr_load)
+        tr_load = trl if tr_num[0] == -1 else tr_num
+        #rich.print(tr_load)
 
         #en_info, tpc_df, tp_df, fwtp_df = zip(*[rdm.load_entry(file_path, tr) if tr in trl else raise IndexError(f"{tr} does not exists!") for tr in tr_load])
         entries = []

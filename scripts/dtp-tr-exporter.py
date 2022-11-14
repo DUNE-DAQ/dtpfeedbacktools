@@ -50,8 +50,10 @@ out_method = {"HDF5": save_hdf5, "CSV": save_csv}
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
-@click.option('-n', '--tr-num', type=int,
-              help="Enter trigger number to export", default=1, show_default=True)
+#@click.option('-n', '--tr-num', type=int,
+#              help="Enter trigger number to export", default=1, show_default=True)
+@click.option('-n', '--tr-num',
+              help="Enter trigger numbers to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these")
 @click.option('-i', '--interactive', is_flag=True,
               help="Run interactive mode", default=False, show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
@@ -76,7 +78,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, out_format: str, out_path: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, out_format: str, out_path: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -97,16 +99,37 @@ def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, channe
     dp = Path(file_path)
     out_path = Path(out_path)
 
+    tr_list = list(tr_num.split(','))
+    tr_num = []
+    for tr in tr_list:
+        if ":" in tr:
+            tr_first, tr_last = map(int, tr.split(':'))
+            tr_num.extend([*range(tr_first, tr_last+1)])
+        else:
+            tr_num.append(int(tr))
+
+    rich.print(f'Triggers to extract: {tr_num}')
+
     rdm = DataManager(dp.parent, frame_type, channel_map_name)
     data_files = sorted(rdm.list_files(), reverse=True)
     rich.print(data_files)
     f = dp.name
     rich.print(f)
     trl = rdm.get_entry_list(f)
+    tr_load = trl if tr_num[0] == -1 else tr_num
     # rich.print(trl)
-    if tr_num not in trl:
-        raise IndexError(f"{tr_num} does not exists!");
-    en_info, adc_df, tp_df, fwtp_df = rdm.load_entry(file_path, tr_num)
+
+    entries = []
+    for tr in tr_load:
+        if tr not in trl:
+            raise IndexError(f"{tr} does not exists!")
+        try:
+            entries.append(rdm.load_entry(file_path, tr))
+        except:
+            rich.print(f"Error when trying to open record {tr}!")
+            pass
+    en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
+    fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     out_base_name = out_path / (dp.stem + f'_tr_{tr_num}')
     out_method[out_format](en_info, adc_df, tp_df, fwtp_df, out_base_name)
