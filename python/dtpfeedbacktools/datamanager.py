@@ -100,23 +100,23 @@ class DataManager:
     }
 
     @staticmethod 
-    def make_channel_map(map_id):
+    def make_channel_map(map_name):
 
-        if map_id == 'VDColdbox':
+        if map_id == 'VDColdboxChannelMap':
             return detchannelmaps.make_map('VDColdboxChannelMap')
-        elif map_id == 'ProtoDUNESP1':
+        elif map_id == 'ProtoDUNESP1ChannelMap':
             return detchannelmaps.make_map('ProtoDUNESP1ChannelMap')
-        elif map_id == 'PD2HD':
+        elif map_id == 'PD2HDChannelMap':
             return detchannelmaps.make_map('PD2HDChannelMap')
-        elif map_id == 'VST':
+        elif map_id == 'VSTChannelMap':
             return VSTChannelMap()
-        elif map_id == 'HDColdbox':
+        elif map_id == 'HDColdboxChannelMap':
             return detchannelmaps.make_map('HDColdboxChannelMap')
         else:
-            raise RuntimeError(f"Unknown channel map id '{map_id}'")
+            raise RuntimeError(f"Unknown channel map id '{map_name}'")
 
 
-    def __init__(self, data_path: str, frame_type: str = 'ProtoWIB', ch_map_id: str = 'VDColdbox') -> None:
+    def __init__(self, data_path: str, frame_type: str = 'ProtoWIB', channel_map_name: str = 'VDColdboxChannelMap') -> None:
 
         if not os.path.isdir(data_path):
             raise ValueError(f"Directory {data_path} does not exist")
@@ -126,8 +126,8 @@ class DataManager:
 
         logging.warning(f"Frame type: {frame_type}")
         self.data_path = data_path
-        self.ch_map_name = ch_map_id
-        self.ch_map = self.make_channel_map(ch_map_id) 
+        self.ch_map_name = channel_map_name
+        self.ch_map = self.make_channel_map(channel_map_name) 
 
         self.offch_to_hw_map = self._init_o2h_map()
         self.femb_to_offch = {k: [int(x) for x in d] for k, d in groupby(self.offch_to_hw_map, self.femb_id_from_offch)}

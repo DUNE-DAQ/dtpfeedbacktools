@@ -148,15 +148,15 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.argument('files_path', type=click.Path(exists=True))
 @click.option('-i', '--interactive', is_flag=True, default=False)
 @click.option('--save', is_flag=True, default=False)
-@click.option('-m', '--map_id', type=click.Choice(
+@click.option('-m', '--channel_map_name', type=click.Choice(
     [
-        "VDColdbox",
-        "HDColdbox",
-        "ProtoDUNESP1",
-        "PD2HD",
-        "VST"
+        "VDColdboxChannelMap",
+        "HDColdboxChannelMap",
+        "ProtoDUNESP1ChannelMap",
+        "PD2HDChannelMap",
+        "VSTChannelMap"
     ]),
-    help="Select input channel map", default="HDColdbox")
+    help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(
     [
         "ProtoWIB",
@@ -166,14 +166,14 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-o', '--outdir', type=click.Path(), default=".")
 @click.option('-s', '--split-factor', type=int, default=5)
 
-def cli(files_path, interactive: bool, save: bool, map_id: str, frame_type: str, outdir: str, split_factor: int) -> None:
+def cli(files_path, interactive: bool, save: bool, channel_map_name: str, frame_type: str, outdir: str, split_factor: int) -> None:
 
     capture_path = Path(files_path)
     outdir = Path(outdir)
     if not capture_path.is_dir():
         raise click.Abort("f{captuure_path} is not a directory")
 
-    rdm = RawDataManager(str(capture_path), frame_type, map_id)
+    rdm = RawDataManager(str(capture_path), frame_type, channel_map_name)
     en_info = {'run_number': rdm.get_run()}
     en_info = pd.DataFrame.from_dict(en_info, orient='index').T  #just a trick to save the info into the hdf5 files
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)

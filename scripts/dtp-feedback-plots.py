@@ -296,15 +296,15 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Run interactive mode", default=False, show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
               help="Select input frame type", default='WIB', show_default=True)
-@click.option('-m', '--map_id', type=click.Choice(
+@click.option('-m', '--channel_map_name', type=click.Choice(
     [
-        "VDColdbox",
-        "HDColdbox",
-        "ProtoDUNESP1",
-        "PD2HD",
-        "VST"
+        "VDColdboxChannelMap",
+        "HDColdboxChannelMap",
+        "ProtoDUNESP1ChannelMap",
+        "PD2HDChannelMap",
+        "VSTChannelMap"
     ]),
-              help="Select input channel map", default='HDColdbox', show_default=True)
+    help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
 @click.option('-t', '--threshold', type=int,
               help="Enter threshold used in run", default=100, show_default=True)
 @click.option('-w', '--num-waves', type=int,
@@ -313,14 +313,14 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
 @click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
 
-def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, map_id: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
+def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
 
     dp = Path(file_path)
     tr_flag = False
 
     if input_type == "TR":
         tr_flag = True
-        rdm = DataManager(dp.parent, frame_type, map_id)
+        rdm = DataManager(dp.parent, frame_type, channel_map_name)
         data_files = sorted(rdm.list_files(), reverse=True)
         rich.print(data_files)
         f = dp.name

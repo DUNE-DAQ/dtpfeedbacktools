@@ -54,25 +54,25 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Run interactive mode", default=False, show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(["ProtoWIB", "WIB"]),
               help="Select input frame type", default='WIB', show_default=True)
-@click.option('-m', '--map_id', type=click.Choice(
+@click.option('-m', '--channel_map_name', type=click.Choice(
     [
-        "VDColdbox",
-        "HDColdbox",
-        "ProtoDUNESP1",
-        "PD2HD",
-        "VST"
+        "VDColdboxChannelMap",
+        "HDColdboxChannelMap",
+        "ProtoDUNESP1ChannelMap",
+        "PD2HDChannelMap",
+        "VSTChannelMap"
     ]),
-              help="Select input channel map", default='HDColdbox', show_default=True)
+    help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
 @click.option('--out_format', type=click.Choice(["HDF5", "CSV"]),
               help="Select format of output", default='HDF5', show_default=True)
 @click.option('-o', '--out_path', help="Output path for plots", default=".", show_default=True)
 
-def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, map_id: str, out_format: str, out_path: str) -> None:
+def cli(file_path: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, out_format: str, out_path: str) -> None:
 
     dp = Path(file_path)
     out_path = Path(out_path)
 
-    rdm = DataManager(dp.parent, frame_type, map_id)
+    rdm = DataManager(dp.parent, frame_type, channel_map_name)
     data_files = sorted(rdm.list_files(), reverse=True)
     rich.print(data_files)
     f = dp.name
