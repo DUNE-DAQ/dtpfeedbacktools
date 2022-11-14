@@ -128,7 +128,7 @@ def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_
         except:
             rich.print(f"Error when trying to open record {tr}!")
             pass
-    en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
+    en_info, adc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
     fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     out_base_name = out_path / (dp.stem + f'_tr_{tr_num}')
