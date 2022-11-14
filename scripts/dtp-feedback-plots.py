@@ -4,9 +4,11 @@ from dtpfeedbacktools.datamanager import DataManager
 import sys
 import rich
 import logging
+import time
 import click
 import h5py
 from rich import print
+from rich.logging import RichHandler
 from pathlib import Path
 from pylab import cm
 from matplotlib import colors
@@ -312,8 +314,31 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-s', '--step', type=int,
               help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
 @click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
-
-def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, outpath: str, num_waves: int, step: int) -> None:
+@click.option('--log_level', type=click.Choice(
+    [
+        "DEBUG",
+        "INFO",
+        "NOTSET"
+    ]), help="Select log level to output", default="INFO", show_default=True)
+@click.option('--log_out', is_flag=True,
+              help="Redirect log info to file", default=False, show_default=True)
+def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
+    script = Path(__file__).stem
+    if log_out:
+        logging.basicConfig(
+            filename=f'log_{script}_{time.strftime("%Y%m%d")}_{time.strftime("%H%M%S")}.txt',
+            filemode="w",
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]"
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True)]
+        )
 
     dp = Path(file_path)
     tr_flag = False
@@ -406,23 +431,5 @@ def cli(file_path: str, input_type: str, tr_num : int, interactive: bool, frame_
         IPython.embed(colors="neutral")
     
 if __name__ == "__main__":
-    from rich.logging import RichHandler
-
-    """
-    logging.basicConfig(
-        level="INFO",
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True)]
-    )
-    """
-
-    logging.basicConfig(
-        filename="log.txt",
-        filemode="w",
-        level="DEBUG",
-        format="%(message)s",
-        datefmt="[%X]"
-    )
 
     cli()

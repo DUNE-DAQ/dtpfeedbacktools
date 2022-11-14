@@ -4,8 +4,10 @@ import sys
 import rich
 from rich.table import Table
 import logging
+import time
 import click
 from rich import print
+from rich.logging import RichHandler
 from pathlib import Path
 import itertools
 
@@ -165,8 +167,32 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     help="Select input frame type", default="WIB")
 @click.option('-o', '--outdir', type=click.Path(), default=".")
 @click.option('-s', '--split-factor', type=int, default=5)
+@click.option('--log_level', type=click.Choice(
+    [
+        "DEBUG",
+        "INFO",
+        "NOTSET"
+    ]), help="Select log level to output", default="INFO", show_default=True)
+@click.option('--log_out', is_flag=True,
+              help="Redirect log info to file", default=False, show_default=True)
 
-def cli(files_path, interactive: bool, save: bool, channel_map_name: str, frame_type: str, outdir: str, split_factor: int) -> None:
+def cli(files_path, interactive: bool, save: bool, channel_map_name: str, frame_type: str, outdir: str, split_factor: int, log_level: str, log_out: bool) -> None:
+    script = Path(__file__).stem
+    if log_out:
+        logging.basicConfig(
+            filename=f'log_{script}_{time.strftime("%Y%m%d")}_{time.strftime("%H%M%S")}.txt',
+            filemode="w",
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]"
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True)]
+        )
 
     capture_path = Path(files_path)
     outdir = Path(outdir)
