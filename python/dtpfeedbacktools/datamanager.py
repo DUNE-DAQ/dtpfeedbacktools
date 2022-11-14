@@ -102,15 +102,15 @@ class DataManager:
     @staticmethod 
     def make_channel_map(map_name):
 
-        if map_id == 'VDColdboxChannelMap':
+        if map_name == 'VDColdboxChannelMap':
             return detchannelmaps.make_map('VDColdboxChannelMap')
-        elif map_id == 'ProtoDUNESP1ChannelMap':
+        elif map_name == 'ProtoDUNESP1ChannelMap':
             return detchannelmaps.make_map('ProtoDUNESP1ChannelMap')
-        elif map_id == 'PD2HDChannelMap':
+        elif map_name == 'PD2HDChannelMap':
             return detchannelmaps.make_map('PD2HDChannelMap')
-        elif map_id == 'VSTChannelMap':
+        elif map_name == 'VSTChannelMap':
             return VSTChannelMap()
-        elif map_id == 'HDColdboxChannelMap':
+        elif map_name == 'HDColdboxChannelMap':
             return detchannelmaps.make_map('HDColdboxChannelMap')
         else:
             raise RuntimeError(f"Unknown channel map id '{map_name}'")
