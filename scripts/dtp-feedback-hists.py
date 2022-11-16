@@ -19,8 +19,9 @@ import matplotlib.backends.backend_pdf
 
 fir_shift = 15
 
-header_labels = {'crate_no':("crate no", ""), 'slot_no':("slot no", ""), 'fiber_no':("fiber no", ""), 'wire_no':("wire no", "")}
-hit_labels = {'start_time':("start time", " [ticks]"), 'end_time':("end time", " [ticks]"), 'peak_time':("peak time", " [ticks]"), 'peak_adc':("peak adc", " [ADCs]"), 'hit_continue':("hit continue", ""), 'sum_adc':("sum adc", " [adc]")}
+header_labels = {'crate_no':("crate no", ""), 'slot_no':("slot no", ""), 'fiber_no':("fiber no", ""), 'wire_no':("wire no", ""),
+                 'start_time':("start time", " [ticks]"), 'end_time':("end time", " [ticks]"), 'peak_time':("peak time", " [ticks]"),
+                 'peak_adc':("peak adc", " [ADCs]"), 'hit_continue':("hit continue", ""), 'sum_adc':("sum adc", " [adc]")}
 
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
@@ -30,30 +31,24 @@ def rms(array):
     return np.sqrt(np.sum(np.power(array.astype(int), 2))/len(array.astype(int)))
 
 
-#------------------------------------------------------------------------------
-def hist_plot(fwtp_df, var, label_dict, nbins=None, ylabel="# hits", pdf=False):
-    #xmin = np.min(fwtp_df[var])-.5
-    #xmax = np.max(fwtp_df[var])+.5
-    #if nbins == None:
-    #    nbins = int(xmax-xmin+1)
+def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
 
-    #bins = np.linspace(xmin, xmax, nbins)
 
     plt.style.use('seaborn-v0_8-whitegrid')
-    fig = plt.figure()
+    fig, axs = plt.subplots(2,5, figsize=(20, 8)); axs = axs.ravel()
+    fig.suptitle("run number: %.0f, trigger record : %.0f" %(run, tr_num), y = 0.99)
 
-    #plt.hist(fwtp_df[var], histtype='barstacked', color="dodgerblue", alpha=0.7, bins=bins, label="FWTP")
-    plt.hist(fwtp_df[var], histtype='barstacked', color="dodgerblue", alpha=0.7, label="FWTP")
-    plt.yscale("log")
-    #plt.xlim(xmin-1, xmax+1)
-    plt.xlabel(label_dict[var][0]+label_dict[var][1], loc="right")
-    plt.ylabel(ylabel, loc="top")
+    c = iter(plt.cm.jet(np.linspace(0, 1,len(header_labels))))
 
-    legend = plt.legend(fontsize=8, loc="upper right")
-    frame = legend.get_frame()
-    frame.set_color('white')
-    frame.set_alpha(0.8)
-    frame.set_linewidth(0)
+    for n, var in enumerate(header_labels.keys()):
+        fwtp_df[var].plot( kind = "hist", range = [min(fwtp_df[var]), max(fwtp_df[var])],
+                           bins = 50, histtype = 'stepfilled', ax = axs[n],
+                           color = next(c), edgecolor = 'k', alpha =0.8)
+        axs[n].set_xlabel(var)
+        axs[n].set_axisbelow(True)
+        #axs[n].set_yscale('log')
+       
+    plt.tight_layout()
 
     if pdf:
         pdf.savefig()
@@ -67,8 +62,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
-#@click.option('-n', '--tr-num', type=int,
-#              help="Enter trigger number to plot", default=1, show_default=True)
 @click.option('-n', '--tr-num',
               help="Enter trigger numbers to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these")
 @click.option('-i', '--interactive', is_flag=True,
@@ -153,6 +146,10 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
                 rich.print(f"Error when trying to open record {tr}!")
                 pass
         en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
+
+        #Throw exception if no FTPs in TR.
+        if fwtp_df.empty:
+           raise Exception("No TPs found in the trigger record! Terminating script...")
         fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     elif input_type == "DF":
@@ -174,21 +171,11 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     outpath = Path(outpath)
 
-    plt.rcParams['figure.figsize'] = [9., 8.]
+    #Plot the trigger record 
+    plt.rcParams.update({'font.size': 10})
     plt.rcParams['figure.dpi'] = 75
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
-
-    for var in header_labels.keys():
-        nbins = None
-        hist_plot(fwtp_df, var, header_labels, nbins=nbins, ylabel="# hits", pdf=pdf)
-
-    for var in hit_labels.keys():
-        if((var == "peak_adc")or(var == "sum_adc")):
-            nbins = 100
-        else:
-            nbins = None
-        hist_plot(fwtp_df, var, hit_labels, nbins=nbins, ylabel="# hits", pdf=pdf)
-
+    hist_plot(fwtp_df, header_labels, run, tr_num[0], pdf = pdf)    
     pdf.close()
 
     if interactive:
