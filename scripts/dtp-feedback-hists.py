@@ -222,13 +222,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     outpath = Path(outpath)
 
-    #Plot the trigger record 
-    plt.rcParams.update({'font.size': 10})
-    plt.rcParams['figure.dpi'] = 75
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_df, header_labels, run, tr_num[0], pdf = pdf)    
-    pdf.close()
-
+    #Add link no to FWTP dataframe
     # NOTE: this shouldn't be here, will move to datamanager eventually
     hw_map = open_hw_map(hardware_map_name)
     rich.print(hw_map)
@@ -236,6 +230,27 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     rich.print(fwtp_df)
 
     fwtp_rates_plot(fwtp_df, dp, outpath)
+
+    #Select bad TPs based on crate, slot, fiber and tstamp info
+    fwtp_bad_link = fwtp_df.loc[fwtp_df["link_no"] == -1]
+    fwtp_large_ts = fwtp_df.loc[fwtp_df["ts"] > 9e17]
+    fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
+
+    fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts]).drop_duplicates()
+
+    #Plot the FWTP histograms
+    fwtp_df = fwtp_df.merge(fwtp_bad, how='left', indicator=True)
+
+    plt.rcParams.update({'font.size': 10})
+    plt.rcParams['figure.dpi'] = 75
+
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
+    hist_plot(fwtp_df[fwtp_df['_merge'] == 'left_only'], header_labels, run, tr_num[0], pdf = pdf)    
+    pdf.close()
+
+    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
+    hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
+    pdf.close()
 
     if interactive:
         import IPython
