@@ -33,6 +33,16 @@ def find_nearest(array, value):
 def rms(array):
     return np.sqrt(np.sum(np.power(array.astype(int), 2))/len(array.astype(int)))
 
+# NOTE: this shouldn't be here, will move to datamanager eventually
+hw_map_paths = {"APA1": "data/np04_hw_map_APA1.txt", "APA2": "data/np04_hw_map_APA2.txt"}
+
+def open_hw_map(hw_map_name):
+    hw_map_path = hw_map_paths[hw_map_name]
+    hw_map_df = pd.read_csv(hw_map_path, index_col=False, header=1, delimiter=" ", names=["DRO_SourceID", "DetLink", "DetSlot", "DetCrate", "DetID", "DRO_Host", "DRO_Card", "DRO_SLR", "DRO_Link"])
+    hw_map = {}
+    for i, line in hw_map_df.iterrows():
+        hw_map[(line.DetCrate, line.DetSlot, line.DetLink)] = line.DRO_Link+6*line.DRO_SLR
+    return hw_map
 
 #------------------------------------------------------------------------------
 def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=None):
@@ -309,6 +319,12 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "VSTChannelMap"
     ]),
     help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
+@click.option('--hardware_map_name', type=click.Choice(
+    [
+        "APA1",
+        "APA2"
+    ]),
+    help="Select input hardware channel map", default="APA1", show_default=True)
 @click.option('-t', '--threshold', type=int,
               help="Enter threshold used in run", default=100, show_default=True)
 @click.option('-w', '--num-waves', type=int,
@@ -320,11 +336,11 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     [
         "DEBUG",
         "INFO",
-        "NOTSET"
+        "CRITICAL"
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -341,6 +357,9 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
             datefmt="[%X]",
             handlers=[RichHandler(rich_tracebacks=True)]
         )
+
+    open_hw_map(hardware_map_name)
+     #return
 
     dp = Path(file_path)
     tr_flag = False
@@ -379,7 +398,8 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
                 rich.print(f"Error when trying to open record {tr}!")
                 pass
         en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
-        fwtp_df = fwtp_df.astype({'trigger_number': int})
+        if not fwtp_df.empty:
+            fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     elif input_type == "DF":
         key_list = get_key_list(file_path)
@@ -395,7 +415,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     rich.print(en_info)
     rich.print(tpc_df)
-    rich.print(fwtp_df)
+    #rich.print(fwtp_df)
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)

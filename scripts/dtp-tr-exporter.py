@@ -74,7 +74,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     [
         "DEBUG",
         "INFO",
-        "NOTSET"
+        "CRITICAL"
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
@@ -129,10 +129,11 @@ def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_
             rich.print(f"Error when trying to open record {tr}!")
             pass
     en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
-    fwtp_df = fwtp_df.astype({'trigger_number': int})
+    if not fwtp_df.empty:
+        fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     out_base_name = out_path / (dp.stem + f'_tr_{tr_num}')
-    out_method[out_format](en_info, adc_df, tp_df, fwtp_df, out_base_name)
+    out_method[out_format](en_info, tpc_df, tp_df, fwtp_df, out_base_name)
     
     if interactive:
         import IPython
