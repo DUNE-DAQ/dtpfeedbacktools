@@ -195,9 +195,9 @@ def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
     plt.legend(title = f"run number: {run}")
     plt.tight_layout()
 
-    # if pdf: pdf.savefig()
-    # plt.show()
-    # plt.close()
+    if pdf: pdf.savefig()
+    plt.show()
+    plt.close()
 
 
 #------------------------------------------------------------------------------
@@ -300,10 +300,9 @@ def plotme_a_channel(tpc_df : pd.DataFrame, run : int, channel : int = 0, pdf : 
     plt.legend(title = f"run number: {run}")
     plt.tight_layout()
 
-    #! not working at the moment
-    # if pdf: pdf.savefig()
-    # plt.show()
-    # plt.close()
+    if pdf: pdf.savefig()
+    plt.show()
+    plt.close()
     
 
 #------------------------------------------------------------------------------
@@ -433,17 +432,12 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     outpath = Path(outpath)
 
     if not tpc_df.empty:
-        #! saving via PdfPages doesn't doesn't work (perhaps an issue with single figure pdfs?), using a workaround below
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
-        plotme_a_channel(tpc_df, run, channel)
-        plt.savefig(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
-        plt.show()
+        plotme_a_channel(tpc_df, run, channel, pdf)
         plt.close()
 
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))
-        plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True)
-        plt.savefig(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))
-        plt.show()
+        plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
         plt.close()
 
 
