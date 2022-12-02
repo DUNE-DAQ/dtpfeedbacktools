@@ -340,8 +340,8 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Number of 1D waveforms to plot", default=10, show_default=True)
 @click.option('-s', '--step', type=int,
               help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
-@click.option('-c', '--channel', type=int,
-              help="offline channel to plot", default=0, show_default=True)
+@click.option('-c', '--channel', type=str,
+              help="offline channel to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these", default=0, show_default=True)
 @click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
 @click.option('--log_level', type=click.Choice(
     [
@@ -351,7 +351,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, channel : int, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, channel : str, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -385,6 +385,15 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
             tr_num.append(int(tr))
 
     rich.print(f'Triggers to extract: {tr_num}')
+
+    ch_list = list(channel.split(','))
+    channel = []
+    for ch in ch_list:
+        if ":" in ch:
+            ch_first, ch_last = map(int, ch.split(':'))
+            channel.extend([*range(ch_first, ch_last+1)])
+        else:
+            channel.append(int(ch))
 
     if input_type == "TR":
         tr_flag = True
@@ -433,12 +442,14 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     if not tpc_df.empty:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
-        plotme_a_channel(tpc_df, run, channel, pdf)
-        plt.close()
+        rich.print(f'ADC Channels to plot: {channel}')
+        for c in channel:        
+            plotme_a_channel(tpc_df, run, c, pdf)
+        pdf.close()
 
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))        
         plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
-        plt.close()
+        pdf.close()
 
 
     if tr_flag and not tp_df.empty and tr_num != -1:
