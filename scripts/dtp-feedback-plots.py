@@ -167,18 +167,12 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     plt.close()
 
 #------------------------------------------------------------------------------
-def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, stitch = False, pdf = None):
-
-    rich.print("df_tp", df_tp)
-
-    is_fw_tp = 'peak_time' in df_tp.columns
-
-    fir_delay = 16*32
-    cmap = cm.get_cmap('bwr',2) #cmap for hit_continue param. 
+def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
     norm = colors.LogNorm() # cmap for raw adc data
+
     # timestamp for the beginning of data capture that t will be plotted relative to
-    t0 = df_adc.index[0]
-    
+    relative_ts = df_adc.index - df_adc.index[0]
+
     #Prepare data for plotting 
     df_adc = df_adc.head(ntsamples) # only plot user-specified number of samples 
     Z = df_adc.to_numpy()[:,1:]
@@ -191,27 +185,14 @@ def plotme_an_ED(df_adc, df_tp, run, ntsamples, zeroped, stitch = False, pdf = N
 
 
     #2D plot of the raw ADC data
-    plt.imshow(Z.T, cmap = 'RdBu_r',aspect = 'auto', origin = 'lower', norm = norm,
-               extent = [ min(df_adc.index),max(df_adc.index), min(chan), max(chan) ] )
-    # Overlay the FW hits 
+    im = plt.imshow(Z.T, cmap = 'RdBu_r',aspect = 'auto', origin = 'lower', norm = norm,
+            extent = [ min(relative_ts),max(relative_ts), min(df_adc.columns), max(df_adc.columns) ] )
 
-    if 'peak_time' in df_tp.columns:
-        plt.scatter(df_tp['peak_time']*32 - fir_delay + df_tp['ts'], df_tp['offline_ch'],  c = df_tp['hit_continue'],
-                    s = 16, label = 'firmware hits', alpha  =0.9, cmap = cmap)
-    else:
-        plt.scatter(df_tp['time_peak'], df_tp['channel'],
-                    s = 16, label = 'stiched hits', alpha =0.9)
-
-    hits = ax2.scatter(x.values, y.values,
-                       c = df_tp['hit_continue'], s = 100, label = 'firmware hits',
-                       alpha = 1, edgecolors=None, linewidths=0, cmap = cmap)
-    cb1 = plt.colorbar(im, ax = ax1, shrink = 0.7)
+    cb1 = plt.colorbar(im, shrink = 0.7)
     cb1.set_label("ADC ", rotation = 270, labelpad = +20)
-    cb2 = plt.colorbar(hits, ax = ax2, ticks = [0.25,0.75], shrink =  0.7)
-    cb2.ax.set_yticklabels(['0','1'])
-    cb2.set_label('hit_continue ', rotation = 270, labelpad = +20)
-    ax2.set_xlabel('relative time [tick]')
-    plt.legend(title = "run number: %.0f" %run)
+    plt.xlabel("relative time [tick]")
+    plt.ylabel("offline channel")
+    plt.legend(title = f"run number: {run}")
     plt.tight_layout()
 
     if pdf: pdf.savefig()
@@ -296,6 +277,49 @@ def plotme_an_ED_v2(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
     plt.close()
 
 
+def plotme_a_channel(tpc_df : pd.DataFrame, run : int, channel : int = 0, pdf : matplotlib.backends.backend_pdf.PdfPages = None):
+    """ Plots the ADC data of specified channels.
+
+    Args:
+        tpc_df (pd.DataFrame): ADC data
+        run (int) run number 
+        channel (int, optional): channel to plot. Defaults to 0.
+        pdf (matplotlib.backends.backend_pdf.PdfPages, optional): pdf backend to use. Defaults to None.
+    """
+    # timestamp for the beginning of data capture that t will be plotted relative to
+    t0 = tpc_df.index[0]
+
+    single_channel = tpc_df.iloc[:, channel] # get data from our signle channel
+    print(f"plotting channel: {single_channel}")
+    
+    with plt.style.context('bmh'): # lazy formatting
+        plt.plot(single_channel.index - t0, single_channel.to_numpy(), marker = "x")
+    plt.title(f"offline channel: {channel}, first timestamp: {t0}")
+    plt.xlabel("relative timestamp [tick]")
+    plt.ylabel("ADC")
+    plt.legend(title = f"run number: {run}")
+    plt.tight_layout()
+
+    if pdf: pdf.savefig()
+    plt.show()
+    plt.close()
+
+
+def parse_number_list(numbers : str):
+    """ Parse a list of numbers stored in string form e.g. 1,2,3:5 -> [1,2,3,4,5]
+    Args:
+        numbers (str) : string to parse
+    """
+    sets = list(numbers.split(',')) # split sets
+    numbers_list = []
+    for s in sets:
+        if ":" in s: # iterate through number in a set if it specifies a range
+            first, last = map(int, s.split(':'))
+            numbers_list.extend([*range(first, last+1)])
+        else:
+            numbers_list.append(int(s))
+    return numbers_list
+
 #------------------------------------------------------------------------------
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -331,6 +355,8 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Number of 1D waveforms to plot", default=10, show_default=True)
 @click.option('-s', '--step', type=int,
               help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
+@click.option('-c', '--channel', type=str,
+              help="offline channel to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these", default=0, show_default=True)
 @click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
 @click.option('--log_level', type=click.Choice(
     [
@@ -340,7 +366,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, channel : str, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -364,16 +390,10 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     dp = Path(file_path)
     tr_flag = False
 
-    tr_list = list(tr_num.split(','))
-    tr_num = []
-    for tr in tr_list:
-        if ":" in tr:
-            tr_first, tr_last = map(int, tr.split(':'))
-            tr_num.extend([*range(tr_first, tr_last+1)])
-        else:
-            tr_num.append(int(tr))
-
+    tr_num = parse_number_list(tr_num)
     rich.print(f'Triggers to extract: {tr_num}')
+
+    channel = parse_number_list(channel)
 
     if input_type == "TR":
         tr_flag = True
@@ -420,18 +440,31 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     outpath = Path(outpath)
 
-    if tr_num != -1:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
-        plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
+    if not tpc_df.empty:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
+        rich.print(f'ADC Channels to plot: {channel}')
+        for c in channel:        
+            plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
+
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))        
+        plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
+        pdf.close()
+
 
     if tr_flag and not tp_df.empty and tr_num != -1:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
         plotme_an_ED_v2(tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
         pdf.close()
 
-
     if not fwtp_df.empty:
+        # 2d event displays
+        if tr_num != -1:
+            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
+            plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
+            pdf.close()
+
+        # centred waveforms + tps
         fwtp_df_centered = fwtp_df[(fwtp_df['hit_continue'] == 0) & (fwtp_df['start_time'] != 0) & (fwtp_df['end_time'] != 63)]
 
         plt.rcParams['figure.figsize'] = [12., 5.]
@@ -448,6 +481,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     
         pdf.close()
         
+        # edge waveforms + tps
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('hit_edge_waveforms_'+ dp.stem + '.pdf'))
         fwtp_df_edges = fwtp_df[(fwtp_df['hit_continue'] == 1) | (fwtp_df['start_time'] == 0) | (fwtp_df['end_time'] == 63)]
         for k in range(num_waves):
