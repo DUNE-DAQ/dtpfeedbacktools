@@ -303,7 +303,22 @@ def plotme_a_channel(tpc_df : pd.DataFrame, run : int, channel : int = 0, pdf : 
     if pdf: pdf.savefig()
     plt.show()
     plt.close()
-    
+
+
+def parse_number_list(numbers : str):
+    """ Parse a list of numbers stored in string form e.g. 1,2,3:5 -> [1,2,3,4,5]
+    Args:
+        numbers (str) : string to parse
+    """
+    sets = list(numbers.split(',')) # split sets
+    numbers_list = []
+    for s in sets:
+        if ":" in s: # iterate through number in a set if it specifies a range
+            first, last = map(int, s.split(':'))
+            numbers_list.extend([*range(first, last+1)])
+        else:
+            numbers_list.append(int(s))
+    return numbers_list
 
 #------------------------------------------------------------------------------
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -375,25 +390,10 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     dp = Path(file_path)
     tr_flag = False
 
-    tr_list = list(tr_num.split(','))
-    tr_num = []
-    for tr in tr_list:
-        if ":" in tr:
-            tr_first, tr_last = map(int, tr.split(':'))
-            tr_num.extend([*range(tr_first, tr_last+1)])
-        else:
-            tr_num.append(int(tr))
-
+    tr_num = parse_number_list(tr_num)
     rich.print(f'Triggers to extract: {tr_num}')
 
-    ch_list = list(channel.split(','))
-    channel = []
-    for ch in ch_list:
-        if ":" in ch:
-            ch_first, ch_last = map(int, ch.split(':'))
-            channel.extend([*range(ch_first, ch_last+1)])
-        else:
-            channel.append(int(ch))
+    channel = parse_number_list(channel)
 
     if input_type == "TR":
         tr_flag = True
