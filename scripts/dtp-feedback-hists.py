@@ -82,7 +82,7 @@ def fwtp_rates_plot(fwtp_df, dp, outpath):
     plt.ylabel(r'FWTP rate [MHz]', labelpad=20, fontsize=16)
 
     plt.legend()
-
+    plt.tight_layout()
     plt.savefig(outpath  / ('fwtp_rates_'+ dp.stem + '.pdf'))
 
 def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
