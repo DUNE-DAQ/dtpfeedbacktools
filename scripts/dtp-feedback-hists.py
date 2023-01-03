@@ -22,9 +22,18 @@ plt.style.use("ggplot")
 
 fir_shift = 15
 
-header_labels = {'crate_no':("crate no", ""), 'slot_no':("slot no", ""), 'fiber_no':("fiber no", ""), 'wire_no':("wire no", ""),
-                 'start_time':("start time", " [ticks]"), 'end_time':("end time", " [ticks]"), 'peak_time':("peak time", " [ticks]"),
-                 'peak_adc':("peak adc", " [ADCs]"), 'hit_continue':("hit continue", ""), 'sum_adc':("sum adc", " [adc]")}
+header_labels = {
+    'crate_no':("crate no", ""),
+    'slot_no':("slot no", ""),
+    'fiber_no':("fiber no", ""),
+    'wire_no':("wire no", ""),
+    'start_time':("start time", " [ticks]"),
+    'end_time':("end time", " [ticks]"),
+    'peak_time':("peak time", " [ticks]"),
+    'peak_adc':("peak adc", " [ADCs]"),
+    'hit_continue':("hit continue", ""),
+    'sum_adc':("sum adc", " [adc]")
+    }
 
 CLK_FREQUENCY = 62.5e6
 TS_PER_WIB = 32
@@ -237,20 +246,20 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
 
     fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts]).drop_duplicates()
-
-    #Plot the FWTP histograms
-    fwtp_df = fwtp_df.merge(fwtp_bad, how='left', indicator=True)
-
+    
     plt.rcParams.update({'font.size': 10})
     plt.rcParams['figure.dpi'] = 75
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_df[fwtp_df['_merge'] == 'left_only'], header_labels, run, tr_num[0], pdf = pdf)    
+    hist_plot(fwtp_df, header_labels, run, tr_num[0], pdf = pdf)    
     pdf.close()
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
-    pdf.close()
+    if fwtp_bad.empty:
+        print('no "bad" firmware TPs were found.')
+    else:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
+        hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
+        pdf.close()
 
     if interactive:
         import IPython
