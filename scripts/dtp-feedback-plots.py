@@ -384,8 +384,8 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
     dp = Path(file_path)
     tr_flag = False
 
-    tr_num = parse_number_list(tr_num)
-    rich.print(f'Triggers to extract: {tr_num}')
+    tr_list = parse_number_list(tr_num)
+    rich.print(f'Triggers to extract: {tr_list}')
 
     channel = parse_number_list(channel)
 
@@ -398,7 +398,7 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
         rich.print(f)
         trl = rdm.get_entry_list(f)
         rich.print(trl)
-        tr_load = trl if tr_num[0] == -1 else tr_num
+        tr_load = trl if tr_list[0] == -1 else tr_list
         #rich.print(tr_load)
 
         #en_info, tpc_df, tp_df, fwtp_df = zip(*[rdm.load_entry(file_path, tr) if tr in trl else raise IndexError(f"{tr} does not exists!") for tr in tr_load])
@@ -429,32 +429,32 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
 
     rich.print(en_info)
     rich.print(tpc_df)
-    #rich.print(fwtp_df)
+    #rich.print(fwtp_df)[{tr_num}]
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
     if not tpc_df.empty:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels[{tr_num}]_{dp.stem}.pdf'))
         rich.print(f'ADC Channels to plot: {channel}')
         for c in channel:        
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
 
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))        
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd[{tr_num}]_{dp.stem}.pdf'))        
         plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
         pdf.close()
 
 
-    if tr_flag and not tp_df.empty and tr_num != -1:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
+    if tr_flag and not tp_df.empty and tr_list != -1:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr[{tr_num}]_{dp.stem}.pdf'))
         plotme_an_ED_v2(tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
         pdf.close()
 
     if not fwtp_df.empty:
         # 2d event displays
-        if tr_num != -1:
-            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
+        if tr_list != -1:
+            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr[{tr_num}]_{dp.stem}.pdf'))
             plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
             pdf.close()
 
@@ -469,7 +469,7 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
         for k in range(num_waves):
             idx = step*k
             rich.print(f"Plotting centered tp  {idx}")
-            if idx > len(fwtp_df_centered.index):
+            if idx >= len(fwtp_df_centered.index):
                 break
             plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
     
@@ -481,7 +481,7 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
         for k in range(num_waves):
             idx = step*k
             rich.print(f"Plotting edge tp  {idx}")
-            if idx > len(fwtp_df_edges.index):
+            if idx >= len(fwtp_df_edges.index):
                 break
 
             plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
