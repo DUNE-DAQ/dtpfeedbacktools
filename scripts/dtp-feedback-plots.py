@@ -33,11 +33,8 @@ def find_nearest(array, value):
 def rms(array):
     return np.sqrt(np.sum(np.power(array.astype(int), 2))/len(array.astype(int)))
 
-# NOTE: this shouldn't be here, will move to datamanager eventually
-hw_map_paths = {"APA1": "data/np04_hw_map_APA1.txt", "APA2": "data/np04_hw_map_APA2.txt"}
-
 def open_hw_map(hw_map_name):
-    hw_map_path = hw_map_paths[hw_map_name]
+    hw_map_path = hw_map_name
     hw_map_df = pd.read_csv(hw_map_path, index_col=False, header=1, delimiter=" ", names=["DRO_SourceID", "DetLink", "DetSlot", "DetCrate", "DetID", "DRO_Host", "DRO_Card", "DRO_SLR", "DRO_Link"])
     hw_map = {}
     for i, line in hw_map_df.iterrows():
@@ -324,6 +321,8 @@ def parse_number_list(numbers : str):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
+@click.option('--hardware_map_file', type=click.Path(exists=True),
+              help="Select input hardware channel map")
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
 #@click.option('-n', '--tr-num', type=int,
@@ -343,12 +342,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "VSTChannelMap"
     ]),
     help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
-@click.option('--hardware_map_name', type=click.Choice(
-    [
-        "APA1",
-        "APA2"
-    ]),
-    help="Select input hardware channel map", default="APA1", show_default=True)
 @click.option('-t', '--threshold', type=int,
               help="Enter threshold used in run", default=100, show_default=True)
 @click.option('-w', '--num-waves', type=int,
@@ -366,7 +359,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, channel : str, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, channel : str, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -384,14 +377,15 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
             handlers=[RichHandler(rich_tracebacks=True)]
         )
 
-    open_hw_map(hardware_map_name)
+    print(f"{hardware_map_file=}")
+    # open_hw_map(hardware_map_file)
      #return
 
     dp = Path(file_path)
     tr_flag = False
 
-    tr_num = parse_number_list(tr_num)
-    rich.print(f'Triggers to extract: {tr_num}')
+    tr_list = parse_number_list(tr_num)
+    rich.print(f'Triggers to extract: {tr_list}')
 
     channel = parse_number_list(channel)
 
@@ -404,7 +398,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
         rich.print(f)
         trl = rdm.get_entry_list(f)
         rich.print(trl)
-        tr_load = trl if tr_num[0] == -1 else tr_num
+        tr_load = trl if tr_list[0] == -1 else tr_list
         #rich.print(tr_load)
 
         #en_info, tpc_df, tp_df, fwtp_df = zip(*[rdm.load_entry(file_path, tr) if tr in trl else raise IndexError(f"{tr} does not exists!") for tr in tr_load])
@@ -435,32 +429,32 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     rich.print(en_info)
     rich.print(tpc_df)
-    #rich.print(fwtp_df)
+    #rich.print(fwtp_df)[{tr_num}]
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
     if not tpc_df.empty:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels{tr_num}_{dp.stem}.pdf'))
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels[{tr_num}]_{dp.stem}.pdf'))
         rich.print(f'ADC Channels to plot: {channel}')
         for c in channel:        
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
 
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd{tr_num}_{dp.stem}.pdf'))        
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd[{tr_num}]_{dp.stem}.pdf'))        
         plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
         pdf.close()
 
 
-    if tr_flag and not tp_df.empty and tr_num != -1:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr{tr_num}_{dp.stem}.pdf'))
+    if tr_flag and not tp_df.empty and tr_list != -1:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr[{tr_num}]_{dp.stem}.pdf'))
         plotme_an_ED_v2(tpc_df, tp_df, run, len(tpc_df), True, pdf = pdf)
         pdf.close()
 
     if not fwtp_df.empty:
         # 2d event displays
-        if tr_num != -1:
-            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr{tr_num}_{dp.stem}.pdf'))
+        if tr_list != -1:
+            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_fwtp_tr[{tr_num}]_{dp.stem}.pdf'))
             plotme_an_ED_v2(tpc_df, fwtp_df, run, len(tpc_df), True, pdf = pdf)
             pdf.close()
 
@@ -475,7 +469,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
         for k in range(num_waves):
             idx = step*k
             rich.print(f"Plotting centered tp  {idx}")
-            if idx > len(fwtp_df_centered.index):
+            if idx >= len(fwtp_df_centered.index):
                 break
             plotme_a_fwtp(fwtp_df_centered.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)
     
@@ -487,7 +481,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
         for k in range(num_waves):
             idx = step*k
             rich.print(f"Plotting edge tp  {idx}")
-            if idx > len(fwtp_df_edges.index):
+            if idx >= len(fwtp_df_edges.index):
                 break
 
             plotme_a_fwtp(fwtp_df_edges.iloc[idx], fwtp_df, tpc_df, idx, run, threshold, 1, pdf=pdf)

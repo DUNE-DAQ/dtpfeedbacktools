@@ -22,9 +22,18 @@ plt.style.use("ggplot")
 
 fir_shift = 15
 
-header_labels = {'crate_no':("crate no", ""), 'slot_no':("slot no", ""), 'fiber_no':("fiber no", ""), 'wire_no':("wire no", ""),
-                 'start_time':("start time", " [ticks]"), 'end_time':("end time", " [ticks]"), 'peak_time':("peak time", " [ticks]"),
-                 'peak_adc':("peak adc", " [ADCs]"), 'hit_continue':("hit continue", ""), 'sum_adc':("sum adc", " [adc]")}
+header_labels = {
+    'crate_no':("crate no", ""),
+    'slot_no':("slot no", ""),
+    'fiber_no':("fiber no", ""),
+    'wire_no':("wire no", ""),
+    'start_time':("start time", " [ticks]"),
+    'end_time':("end time", " [ticks]"),
+    'peak_time':("peak time", " [ticks]"),
+    'peak_adc':("peak adc", " [ADCs]"),
+    'hit_continue':("hit continue", ""),
+    'sum_adc':("sum adc", " [adc]")
+    }
 
 CLK_FREQUENCY = 62.5e6
 TS_PER_WIB = 32
@@ -37,11 +46,8 @@ def find_nearest(array, value):
 def rms(array):
     return np.sqrt(np.sum(np.power(array.astype(int), 2))/len(array.astype(int)))
 
-# NOTE: this shouldn't be here, will move to datamanager eventually
-hw_map_paths = {"APA1": "data/np04_hw_map_APA1.txt", "APA2": "data/np04_hw_map_APA2.txt"}
-
 def open_hw_map(hw_map_name):
-    hw_map_path = hw_map_paths[hw_map_name]
+    hw_map_path = hw_map_name
     hw_map_df = pd.read_csv(hw_map_path, index_col=False, header=1, delimiter=" ", names=["DRO_SourceID", "DetLink", "DetSlot", "DetCrate", "DetID", "DRO_Host", "DRO_Card", "DRO_SLR", "DRO_Link"])
     hw_map = {}
     for i, line in hw_map_df.iterrows():
@@ -73,7 +79,7 @@ def fwtp_rates_plot(fwtp_df, dp, outpath):
     plt.ylabel(r'FWTP rate [MHz]', labelpad=20, fontsize=16)
 
     plt.legend()
-
+    plt.tight_layout()
     plt.savefig(outpath  / ('fwtp_rates_'+ dp.stem + '.pdf'))
 
 def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
@@ -105,6 +111,8 @@ def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
+@click.option('--hardware_map_file', type=click.Path(exists=True),
+              help="Select input hardware channel map")
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
 @click.option('-n', '--tr-num',
@@ -122,12 +130,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
         "VSTChannelMap"
     ]),
     help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
-@click.option('--hardware_map_name', type=click.Choice(
-    [
-        "APA1",
-        "APA2"
-    ]),
-    help="Select input hardware channel map", default="APA1", show_default=True)
 @click.option('-t', '--threshold', type=int,
               help="Enter threshold used in run", default=100, show_default=True)
 @click.option('-w', '--num-waves', type=int,
@@ -143,7 +145,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, hardware_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, outpath: str, log_level: str, log_out: bool) -> None:
 
     script = Path(__file__).stem
     if log_out:
@@ -224,7 +226,7 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
 
     #Add link no to FWTP dataframe
     # NOTE: this shouldn't be here, will move to datamanager eventually
-    hw_map = open_hw_map(hardware_map_name)
+    hw_map = open_hw_map(hardware_map_file)
     rich.print(hw_map)
     fwtp_df['link_no'] = fwtp_df.apply(get_link, hw_map=hw_map, axis=1)
     rich.print(fwtp_df)
@@ -237,20 +239,20 @@ def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: 
     fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
 
     fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts]).drop_duplicates()
-
-    #Plot the FWTP histograms
-    fwtp_df = fwtp_df.merge(fwtp_bad, how='left', indicator=True)
-
+    
     plt.rcParams.update({'font.size': 10})
     plt.rcParams['figure.dpi'] = 75
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_df[fwtp_df['_merge'] == 'left_only'], header_labels, run, tr_num[0], pdf = pdf)    
+    hist_plot(fwtp_df, header_labels, run, tr_num[0], pdf = pdf)    
     pdf.close()
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
-    pdf.close()
+    if fwtp_bad.empty:
+        print('no "bad" firmware TPs were found.')
+    else:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
+        hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
+        pdf.close()
 
     if interactive:
         import IPython
