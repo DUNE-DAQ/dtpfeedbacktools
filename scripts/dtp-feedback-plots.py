@@ -167,18 +167,23 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
 def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
     norm = colors.LogNorm() # cmap for raw adc data
 
+
+    #Prepare data for plotting 
+    # df_adc = df_adc.loc[ntsamples[0]:ntsamples[1]] # only plot user-specified number of samples 
+    df_adc = df_adc.loc[df_adc.index[ntsamples[0]]:df_adc.index[ntsamples[1]]]
+
     # timestamp for the beginning of data capture that t will be plotted relative to
     relative_ts = df_adc.index - df_adc.index[0]
 
-    #Prepare data for plotting 
-    df_adc = df_adc.head(ntsamples) # only plot user-specified number of samples 
     Z = df_adc.to_numpy()[:,1:]
 
     #quick cheated pedsub
     if zeroped:
-        Z = Z - np.mean(Z, axis = 0)
+        Z = Z - np.median(Z, axis = 0)
+        std = np.mean(np.std(Z, axis = 0))
+        rms = np.mean(np.sqrt(np.mean(Z**2, axis = 0)))
         #update cmap so it's centered at 0.
-        norm = colors.TwoSlopeNorm(vmin=np.min(Z), vcenter=0, vmax=np.max(Z))
+        norm = colors.TwoSlopeNorm(vmin=-5 * rms, vcenter=0, vmax=5 * rms)
 
 
     #2D plot of the raw ADC data
@@ -287,11 +292,11 @@ def plotme_a_channel(tpc_df : pd.DataFrame, run : int, channel : int = 0, pdf : 
     t0 = tpc_df.index[0]
 
     single_channel = tpc_df.iloc[:, channel] # get data from our signle channel
-    print(f"plotting channel: {single_channel}")
+    print(f"plotting channel: {channel}")
     
     with plt.style.context('bmh'): # lazy formatting
-        plt.plot(single_channel.index - t0, single_channel.to_numpy(), marker = "x")
-    plt.title(f"offline channel: {channel}, first timestamp: {t0}")
+        plt.plot(single_channel.index - t0, single_channel.to_numpy(), marker = "x", label = f"offline channel: {channel}")
+    plt.title(f"first timestamp: {t0}")
     plt.xlabel("relative timestamp [tick]")
     plt.ylabel("ADC")
     plt.legend(title = f"run number: {run}")
@@ -350,6 +355,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               help="Number of TPs to skip when doing 1D plots", default=150, show_default=True)
 @click.option('-c', '--channel', type=str,
               help="offline channel to plot, either a single value, a comma-separated list, a colon-separated range or a combination of these", default=0, show_default=True)
+@click.option('--time_range', type=str, default = "0:1", help="fractional time range for ADC event display, colon separated for min max range e.g. min:max")
 @click.option('-o', '--outpath', help="Output path for plots", default=".", show_default=True)
 @click.option('--log_level', type=click.Choice(
     [
@@ -359,7 +365,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, channel : str, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, channel : str, time_range : str, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -441,8 +447,11 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
 
+        time_range = time_range.split(":", 1)
+        time_range = [int(len(tpc_df) * float(time_range[0])), int(len(tpc_df) * float(time_range[1])) - 1]
+
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd[{tr_num}]_{dp.stem}.pdf'))        
-        plotme_an_ADC_ED(tpc_df, run, len(tpc_df), True, pdf)
+        plotme_an_ADC_ED(tpc_df, run, time_range, True, pdf)
         pdf.close()
 
 
