@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from dtpfeedbacktools.datamanager import DataManager
+import detchannelmaps
 import sys
 import rich
 import logging
@@ -164,12 +165,10 @@ def plotme_a_fwtp(rtp, rtp_df, raw_adcs, i, run, threshold, fir_correction, pdf=
     plt.close()
 
 #------------------------------------------------------------------------------
-def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
+def plotme_an_ADC_ED(df_adc, run, planeID, ntsamples, zeroped, pdf = None):
     norm = colors.LogNorm() # cmap for raw adc data
 
-
     #Prepare data for plotting 
-    # df_adc = df_adc.loc[ntsamples[0]:ntsamples[1]] # only plot user-specified number of samples 
     df_adc = df_adc.loc[df_adc.index[ntsamples[0]]:df_adc.index[ntsamples[1]]]
 
     # timestamp for the beginning of data capture that t will be plotted relative to
@@ -180,10 +179,9 @@ def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
     #quick cheated pedsub
     if zeroped:
         Z = Z - np.median(Z, axis = 0)
-        std = np.mean(np.std(Z, axis = 0))
         rms = np.mean(np.sqrt(np.mean(Z**2, axis = 0)))
         #update cmap so it's centered at 0.
-        norm = colors.TwoSlopeNorm(vmin=-5 * rms, vcenter=0, vmax=5 * rms)
+        norm = colors.TwoSlopeNorm(vmin = -5 * rms, vcenter = 0, vmax = 5 * rms)
 
 
     #2D plot of the raw ADC data
@@ -194,6 +192,7 @@ def plotme_an_ADC_ED(df_adc, run, ntsamples, zeroped, pdf = None):
     cb1.set_label("ADC ", rotation = 270, labelpad = +20)
     plt.xlabel("relative time [tick]")
     plt.ylabel("offline channel")
+    plt.title(f"PlaneID: {planeID} | start timestamp: {df_adc.index[0]}")
     plt.legend(title = f"run number: {run}")
     plt.tight_layout()
 
@@ -441,19 +440,28 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
     outpath = Path(outpath)
 
     if not tpc_df.empty:
+        time_range = time_range.split(":", 1)
+        time_range = [int(len(tpc_df) * float(time_range[0])), int(len(tpc_df) * float(time_range[1])) - 1]
+
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd[{tr_num}]_{dp.stem}.pdf'))        
+
+        # split the df by channel type for event displays
+        cmap = detchannelmaps.make_map(channel_map_name) # remake channel map in case we are looking at exported TRs
+
+        planes, start_index = np.unique([cmap.get_plane_from_offline_channel(i) for i in tpc_df.columns], return_index = True)
+
+        start_index = np.append(start_index, len(tpc_df.columns))
+        
+        for p in range(len(planes)):
+            plotme_an_ADC_ED(tpc_df.iloc[:, start_index[p]:start_index[p + 1]], run, planes[p], time_range, True, pdf)
+
+        pdf.close()
+
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_channels[{tr_num}]_{dp.stem}.pdf'))
         rich.print(f'ADC Channels to plot: {channel}')
         for c in channel:        
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
-
-        time_range = time_range.split(":", 1)
-        time_range = [int(len(tpc_df) * float(time_range[0])), int(len(tpc_df) * float(time_range[1])) - 1]
-
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd[{tr_num}]_{dp.stem}.pdf'))        
-        plotme_an_ADC_ED(tpc_df, run, time_range, True, pdf)
-        pdf.close()
-
 
     if tr_flag and not tp_df.empty and tr_list != -1:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr[{tr_num}]_{dp.stem}.pdf'))
