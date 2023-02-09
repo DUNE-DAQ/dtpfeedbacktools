@@ -13,108 +13,17 @@
 
 #include "dtpfeedbacktools/RawFileReader.hpp"
 #include "dtpfeedbacktools/FWTP.hpp"
+#include "dtpfeedbacktools/fwtp_unpack_utils.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
-
-template<typename T, typename U> constexpr size_t offset_of(U T::*member)
-{
-    return (char*)&((T*)nullptr->*member) - (char*)nullptr;
-}
 
 namespace dunedaq {
 namespace dtpfeedbacktools {
 namespace python {
 
-std::vector<FWTP> check_fwtps(void *buf, size_t n_blocks, bool safe_mode=true){
-
-}
-
-
-std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode=true){
-
-    constexpr uint16_t trl_magic = 0xf00d;
-
-    std::vector<FWTP> fwtps;
-    fwtps.reserve(n_blocks/3);
-
-
-    size_t offset(0), offset_pad1(0), offset_trl(0);
-
-    // Search for the first trailer
-    // discard block before it
-
-    // Work in bytes
-    auto buf_u8 = static_cast<uint8_t*>(buf);
-    size_t buf_size = n_blocks * sizeof(FWTPHeader);
-
-    // Find the first occurence of f00d
-    for (; offset_pad1<buf_size; ++offset_pad1) {
-
-      if (((buf_u8[offset_pad1+1]<<8)+buf_u8[offset_pad1]) != trl_magic) {
-        continue;
-      }
-
-      if (offset_pad1 < offset_of(&FWTPTrailer::padding_1)) {
-        continue;
-      }
-
-      break;
-    }
-
-    // work back the trailer offset
-    offset_trl= offset_pad1-offset_of(&FWTPTrailer::padding_1);
-
-    // calculate the binary to mem block phase
-    offset = offset_trl % sizeof(FWTPHeader);
-
-    size_t i_trl_0((offset_trl-offset)/sizeof(FWTPHeader));
-
-    FWTPHeader *hdr = static_cast<FWTPHeader *>(buf+offset);
-    FWTPTrailer *trl = static_cast<FWTPTrailer *>(buf+offset);
-
-    // Initialize indexes
-    size_t i = 0;
-
-
-    // In safe mode start from the block after the first trailer
-    if ( safe_mode ) {
-      i = i_trl_0+1;
-    }
-
-  // std::cout << "starting from block " << i << " (byte offset " ")" << offset << std::endl;
-
-    size_t i_hdr(i), i_trl(i);
-
-    //std::cout << "n blocks " << n_blocks << std::endl;
-
-    for (; i<n_blocks; ++i) {
-
-      if (trl[i].padding_1 != trl_magic) {
-        //std::cout << "Something went terribly wrong..." << std::endl;
-        //std::cout << "trl.padding_1 " << trl[i].padding_1 << std::endl;
-        continue;
-      }
-      //std::cout << "iblock " << i << std::endl;
-      //std::cout << "trl.padding_1 " << trl[i].padding_1 << std::endl;
-
-      i_trl = i;
-
-      int64_t n_hits = ((int64_t)i_trl-((int64_t)i_hdr+1));
-      if (  n_hits < 1 ) {
-        std::cout << "Block " << i << " -> " << n_hits << " ~ " <<i_trl << " " << i_hdr << std::endl;
-      } else {
-        fwtps.push_back(FWTP((void*)(hdr+i_hdr), i_trl-(i_hdr+1)));
-      }
-
-      i_hdr = i+1;
-    }
-
-    return fwtps;
-}
-
 //-----------------
-py::dict fwtps_to_arrays(const std::vector<FWTP>& v) {
+py::dict fwtps_to_nparrays(const std::vector<FWTP>& v) {
 
   size_t n_hits = 0;
   for(const FWTP& tp : v ) {
@@ -194,10 +103,10 @@ py::dict fwtps_to_arrays(const std::vector<FWTP>& v) {
   return fwtp_arrays;
 }
 
-py::dict unpack_fwtps_to_arrays(void *buf, size_t n_blocks, bool safe_mode=true) {
+py::dict unpack_fwtps_to_nparrays(void *buf, size_t n_blocks, bool safe_mode=true) {
 
     auto fwtps = unpack_fwtps(buf, n_blocks, safe_mode);
-    return fwtps_to_arrays(fwtps);
+    return fwtps_to_nparrays(fwtps);
 }
 
 
@@ -269,11 +178,11 @@ PYBIND11_MODULE(_daq_dtpfeedbacktools_py, m)
 
   m.def("check_fwtps", &check_fwtps, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
   m.def("unpack_fwtps", &unpack_fwtps, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
-  m.def("fwtps_to_arrays", &fwtps_to_arrays);
-  m.def("unpack_fwtps_to_arrays", &unpack_fwtps_to_arrays, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
+  m.def("fwtps_to_nparrays", &fwtps_to_nparrays);
+  m.def("unpack_fwtps_to_nparrays", &unpack_fwtps_to_nparrays, "buf"_a, "n_blocks"_a, "safe_mode"_a = true);
 
 }
 
 } // namespace python
-}   // namespace dtpfeedbacktools
+} // namespace dtpfeedbacktools
 } // namespace dunedaq

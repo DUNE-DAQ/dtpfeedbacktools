@@ -21,6 +21,7 @@ import collections
 import rich
 from rich import print
 from itertools import groupby
+from . import unpack_fwtps
 
 """
 DataManager is responsible of raw data information management: discovery, loading, and reference runs handling
@@ -41,6 +42,41 @@ def get_wib_header_info( frag ):
     logging.debug(f"detector {wh.detector_id}, crate: {wh.crate}, slot: {wh.slot}, fibre: {wh.link}")
 
     return (wh.detector_id, wh.crate, wh.slot, wh.link)
+
+# WARNING: Duplicate from rawdatamanager: factorize!
+def fwtp_list_to_df(fwtps: list, ch_map):
+    fwtp_array = []
+
+    for fwtp in fwtps:
+        tph = fwtp.get_header()
+        tpt = fwtp.get_trailer()
+
+        for j in range(fwtp.get_n_hits()):
+            tpd = fwtp.get_data(j)
+            fwtp_array.append((
+                tph.get_timestamp(),
+                ch_map.get_offline_channel_from_crate_slot_fiber_chan(tph.crate_no, tph.slot_no, tph.fiber_no, tph.wire_no),
+                tph.crate_no, 
+                tph.slot_no,
+                tph.fiber_no,
+                tph.wire_no,
+                tph.flags,
+                tpt.median,
+                tpt.accumulator,
+                tpd.start_time,
+                tpd.end_time,
+                tpd.peak_time,
+                tpd.peak_adc,
+                tpd.hit_continue,
+                tpd.tp_flags,
+                tpd.sum_adc
+            ))
+    #rprint(f"Unpacked {len(fwtp_array)} FW TPs")
+
+    rtp_df = pd.DataFrame(fwtp_array, columns=['ts', 'offline_ch', 'crate_no', 'slot_no', 'fiber_no', 'wire_no', 'flags', 'median', 'accumulator', 'start_time', 'end_time', 'peak_time', 'peak_adc', 'hit_continue', 'tp_flags', 'sum_adc'])
+
+    return rtp_df
+
 
 class VSTChannelMap(object):
 
@@ -64,23 +100,23 @@ class DataManager:
     }
 
     @staticmethod 
-    def make_channel_map(map_id):
+    def make_channel_map(map_name):
 
-        if map_id == 'VDColdbox':
+        if map_name == 'VDColdboxChannelMap':
             return detchannelmaps.make_map('VDColdboxChannelMap')
-        elif map_id == 'ProtoDUNESP1':
+        elif map_name == 'ProtoDUNESP1ChannelMap':
             return detchannelmaps.make_map('ProtoDUNESP1ChannelMap')
-        elif map_id == 'PD2HD':
+        elif map_name == 'PD2HDChannelMap':
             return detchannelmaps.make_map('PD2HDChannelMap')
-        elif map_id == 'VST':
+        elif map_name == 'VSTChannelMap':
             return VSTChannelMap()
-        elif map_id == 'HDColdbox':
+        elif map_name == 'HDColdboxChannelMap':
             return detchannelmaps.make_map('HDColdboxChannelMap')
         else:
-            raise RuntimeError(f"Unknown channel map id '{map_id}'")
+            raise RuntimeError(f"Unknown channel map id '{map_name}'")
 
 
-    def __init__(self, data_path: str, frame_type: str = 'ProtoWIB', ch_map_id: str = 'VDColdbox') -> None:
+    def __init__(self, data_path: str, frame_type: str = 'ProtoWIB', channel_map_name: str = 'VDColdboxChannelMap') -> None:
 
         if not os.path.isdir(data_path):
             raise ValueError(f"Directory {data_path} does not exist")
@@ -90,8 +126,8 @@ class DataManager:
 
         logging.warning(f"Frame type: {frame_type}")
         self.data_path = data_path
-        self.ch_map_name = ch_map_id
-        self.ch_map = self.make_channel_map(ch_map_id) 
+        self.ch_map_name = channel_map_name
+        self.ch_map = self.make_channel_map(channel_map_name) 
 
         self.offch_to_hw_map = self._init_o2h_map()
         self.femb_to_offch = {k: [int(x) for x in d] for k, d in groupby(self.offch_to_hw_map, self.femb_id_from_offch)}
@@ -204,15 +240,15 @@ class DataManager:
 
         if has_trs:
             logging.debug(f"Trigger Records detected!")
-            get_ehdr = rdf.get_trh
+            get_entry_hdr = rdf.get_trh
         elif has_tss:
             logging.debug(f"TimeSlices detected!")
-            get_ehdr = rdf.get_tsh
+            get_entry_hdr = rdf.get_tsh
 
         else:
             raise RuntimeError(f"No TriggerRecords nor TimeSlices found in {file_name}")
 
-        en_hdr = get_ehdr((entry,0))
+        en_hdr = get_entry_hdr((entry,0))
         en_source_ids = rdf.get_source_ids((entry, 0))
 
         if has_trs:
@@ -232,14 +268,28 @@ class DataManager:
             en_ts = 0
 
         print(en_info)
+        en_info = pd.DataFrame.from_dict(en_info, orient='index').T #just a trick to save the info into the hdf5 files
+        en_info = en_info.set_index('trigger_number')
+        # Sort source ides by subsystem
+        # y = sorted(en_source_ids, key=lambda x: x.subsystem.name)
+        # it = itertools.groupby(y, lambda x: x.subsystem.name)
+        # z = { k:list(g) for k,g in it}
+        # Unpack detector first
+        # Create dataframe
+        # Process tps second
+        # Create dataframe
+        # Process fwtps last
+        # Create dataframe
 
         tpc_dfs = []
+        fwtp_dfs = []
+
         tp_array = []
         for sid in en_source_ids:
             frag = rdf.get_frag((entry, 0),sid)
             frag_hdr = frag.get_header()
 
-            logging.debug(f"Inspecting {sid.version}, {sid.subsystem}, {sid.id}")
+            logging.info(f"Inspecting {sid.version}, subsys={sid.subsystem}, id={sid.id}")
             logging.debug(f"Run number : {frag.get_run_number()}")
             logging.debug(f"Trigger number : {frag.get_trigger_number()}")
             logging.debug(f"Trigger TS    : {frag.get_trigger_timestamp()}")
@@ -250,10 +300,11 @@ class DataManager:
             logging.debug(f"Size          : {frag.get_size()}")
 
             if (sid.subsystem == daqdataformats.SourceID.kDetectorReadout and frag.get_fragment_type() == self.frag_type):
+
                 payload_size = (frag.get_size()-frag_hdr.sizeof())
                 if not payload_size:
                     continue
-                rich.print(f"Number of WIB frames: {payload_size}")
+                logging.info(f"Subsys={sid.subsystem}, id={sid.id}: Number of WIB frames: {payload_size}")
 
                 det_id, crate_no, slot_no, link_no = self.get_hdr_info(frag)
                 logging.debug(f"crate: {crate_no}, slot: {slot_no}, fibre: {link_no}")
@@ -263,7 +314,7 @@ class DataManager:
                 ts = self.frag_unpack.np_array_timestamp(frag)
                 adcs = self.frag_unpack.np_array_adc(frag)
                 #ts = (ts - en_ts).astype('int64')
-                logging.debug(f"Unpacking {sid.version}, {sid.subsystem}, {sid.id} completed")
+                logging.debug(f"Unpacking Subsys={sid.subsystem}, id={sid.id} completed")
 
                 df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]) for c in range(256)]))
                 df = df.set_index('ts')
@@ -271,15 +322,27 @@ class DataManager:
 
                 tpc_dfs.append(df)
 
-            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() in [ daqdataformats.FragmentType.kSW_TriggerPrimitive, daqdataformats.FragmentType.kFW_TriggerPrimitive ]:
+            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kTriggerPrimitive:
                 tp_size = detdataformats.trigger_primitive.TriggerPrimitive.sizeof()
                 n_frames = (frag.get_size()-frag_hdr.sizeof())//tp_size
-                rich.print(f"Number of TPS frames: {n_frames}")
+                logging.info(f"Subsys={sid.subsystem}, id={sid.id}: Number of TP frames: {n_frames}")
+
                 for i in range(n_frames):
                     tp = detdataformats.trigger_primitive.TriggerPrimitive(frag.get_data(i*tp_size))
                     tp_array.append( (tp.time_start, tp.time_peak, tp.time_over_threshold, tp.channel, tp.adc_integral, tp.adc_peak, tp.flag) )
-                    
-        tp_df = pd.DataFrame(tp_array, columns=['time_start', 'time_peak', 'time_over_threshold', 'channel', 'adc_integral', 'adc_peak', 'flag'])
+            elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kFW_TriggerPrimitive:
+
+                # a tpblock is 12 bytes
+                tp_block_size = 12
+                # No header in fwtp fragments
+                n_tp_blocks = frag.get_size()//tp_block_size
+                fwtps = unpack_fwtps(frag.get_data(), n_tp_blocks, safe_mode=False)
+                
+                logging.info(f"Subsys={sid.subsystem}, id={sid.id}: Number of FWTPs: {len(fwtps)}")
+                fwtp_df = fwtp_list_to_df(fwtps, self.ch_map)
+                fwtp_dfs.append(fwtp_df)
+
+        tp_df = pd.DataFrame(tp_array, columns=['start_time', 'peak_time', 'time_over_threshold', 'offline_ch', 'sum_adc', 'peak_adc', 'flag'])
         
         if tpc_dfs:
             tpc_df = pd.concat(tpc_dfs, axis=1)
@@ -289,94 +352,20 @@ class DataManager:
             tpc_df = pd.DataFrame( columns=['ts'])
             tpc_df = tpc_df.set_index('ts')
 
-        self.cache[uid] = (en_info, tpc_df, tp_df)
+        if fwtp_dfs:
+            fwtp_df = pd.concat(fwtp_dfs)
+            fwtp_df = fwtp_df.sort_values(by=['ts'])
+            if not fwtp_df.empty:
+                fwtp_df['trigger_number'] = en_info.index.values[0]
+                fwtp_df = fwtp_df.astype({'trigger_number': int})
+            # Sort columns (channels)
+            # fwtp_df = fwtp_df.reindex(sorted(fwtp_df.columns), axis=1)
+        else:
+            fwtp_df = pd.DataFrame( columns=['ts'])
+
+        self.cache[uid] = (en_info, tpc_df, tp_df, fwtp_df)
         if len(self.cache) > self.max_cache_size:
             old_uid, _ = self.cache.popitem(False)
             logging.info(f"Removing {old_uid[0]}:{old_uid[1]} from cache")
 
-        return en_info, tpc_df, tp_df
-
-    # def load_trigger_record(self, file_name: str, tr_num: int) -> list:
-
-    #     uid = (file_name, tr_num)
-    #     if uid in self.cache:
-    #         logging.info(f"{file_name}:{tr_num} already loaded. returning cached dataframe")
-    #         tr_info, tr_df, tp_df = self.cache[uid]
-    #         self.cache.move_to_end(uid, False)
-    #         return tr_info, tr_df, tp_df
-
-    #     file_path = os.path.join(self.data_path, file_name)
-    #     rdf = hdf5libs.HDF5RawDataFile(file_path) # number of events = 10000 is not used
-
-    #     tr_hdr = rdf.get_trh((tr_num,0))
-    #     tr_source_ids = rdf.get_source_ids((tr_num, 0))
-
-
-    #     tr_info = {
-    #         'run_number': tr_hdr.get_run_number(),
-    #         'trigger_number': tr_hdr.get_trigger_number(),
-    #         'trigger_timestamp': tr_hdr.get_trigger_timestamp(),
-    #     }
-
-    #     tr_ts = tr_hdr.get_trigger_timestamp()
-
-
-    #     tpc_dfs = []
-    #     tp_array = []
-    #     for sid in tr_source_ids:
-    #         frag = rdf.get_frag((tr_num, 0),sid)
-    #         frag_hdr = frag.get_header()
-
-    #         logging.debug(f"Inspecting {sid.version}, {sid.subsystem}, {sid.id}")
-    #         logging.debug(f"Run number : {frag.get_run_number()}")
-    #         logging.debug(f"Trigger number : {frag.get_trigger_number()}")
-    #         logging.debug(f"Trigger TS    : {frag.get_trigger_timestamp()}")
-    #         logging.debug(f"Window begin  : {frag.get_window_begin()}")
-    #         logging.debug(f"Window end    : {frag.get_window_end()}")
-    #         logging.debug(f"Fragment type : {frag.get_fragment_type()}")
-    #         logging.debug(f"Fragment code : {frag.get_fragment_type_code()}")
-    #         logging.debug(f"Size          : {frag.get_size()}")
-
-    #         if sid.subsytem ==  self.frag_type:
-    #             payload_size = (frag.get_size()-frag_hdr.sizeof())
-    #             if not payload_size:
-    #                 continue
-
-    #             det_id, crate_no, slot_no, link_no = self.get_hdr_info(frag)
-    #             logging.debug(f"crate: {crate_no}, slot: {slot_no}, fibre: {link_no}")
-
-    #             off_chans = [self.ch_map.get_offline_channel_from_crate_slot_fiber_chan(crate_no, slot_no, link_no, c) for c in range(256)]
-
-    #             ts = self.frag_unpack.np_array_timestamp(frag)
-    #             adcs = self.frag_unpack.np_array_adc(frag)
-    #             ts = (ts - tr_ts).astype('int64')
-    #             logging.debug(f"Unpacking {sid.version}, {sid.subsystem}, {sid.id} completed")
-
-    #             df = pd.DataFrame(collections.OrderedDict([('ts', ts)]+[(off_chans[c], adcs[:,c]) for c in range(256)]))
-    #             df = df.set_index('ts')
-    #             # rich.print(df)
-
-    #             tpc_dfs.append(df)
-
-    #         elif sid.subsystem == daqdataformats.SourceID.kTrigger and frag.get_fragment_type() == daqdataformats.FragmentType.kSW_TriggerPrimitive:
-    #             tp_size = detdataformats.trigger_primitive.TriggerPrimitive.sizeof()
-    #             n_frames = (frag.get_size()-frag_hdr.sizeof())//tp_size
-    #             rich.print(f"Number of TPS frames: {n_frames}")
-    #             for i in range(n_frames):
-    #                 tp = detdataformats.trigger_primitive.TriggerPrimitive(frag.get_data(i*tp_size))
-    #                 tp_array.append( (tp.time_peak-tr_ts, tp.channel, tp.adc_peak) )
-
-
-
-        tp_df = pd.DataFrame(tp_array, columns=['time', 'channel', 'adc_peak'])
-        # rich.print(tp_array)
-        tpc_df = pd.concat(tpc_dfs, axis=1)
-        # Sort columns (channels)
-        tpc_df = tpc_df.reindex(sorted(tpc_df.columns), axis=1)
-
-        self.cache[uid] = (tr_info, tpc_df, tp_df)
-        if len(self.cache) > self.max_cache_size:
-            old_uid, _ = self.cache.popitem(False)
-            logging.info(f"Removing {old_uid[0]}:{old_uid[1]} from cache")
-
-        return tr_info, tpc_df, tp_df
+        return en_info, tpc_df, tp_df, fwtp_df

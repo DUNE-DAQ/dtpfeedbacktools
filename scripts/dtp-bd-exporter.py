@@ -4,15 +4,17 @@ import sys
 import rich
 from rich.table import Table
 import logging
+import time
 import click
 from rich import print
+from rich.logging import RichHandler
 from pathlib import Path
 import itertools
 
 import pandas as pd
 
 import dtpfeedbacktools
-from dtpfeedbacktools.rawdatamanager import RawDataManager
+from dtpfeedbacktools.rawdatamanager import RawDataManager, RawCaptureDetails, RawFileInfo
 
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
@@ -26,27 +28,6 @@ NS_PER_TICK = 16
 TS_CLK_FREQ=62.5e6
 tp_block_size = 3
 tp_block_bytes = tp_block_size*4
-
-class RawCaptureDetails:
-    '''Holds list of capture files that form a capture group'''
-    def __init__(self):
-        self.tp_file = None
-        self.adc_files = []
-        self.ts_overlap_min = None
-        self.ts_overlap_max = None
-    
-    def __repr__(self):
-        return f"RawCaptureDetails({self.tp_file.link_id}, {[i.link_id for i in self.adc_files]})"
-
-class RawFileInfo:
-    '''Details of a raw data capture file'''
-    def __init__(self, name, link_id):
-        self.name = name
-        self.link_id = link_id
-        self.ts_min = None
-        self.ts_max = None
-        self.ts_offsets = None
-
 
 def get_capture_details(rdm : RawDataManager):
 
@@ -152,8 +133,7 @@ def scan_tp_ts_offsets(tp_file, n_samples = 128):
 
         blk = rfr.read_block(n_bytes, offset)
 
-        fwtps = dtpfeedbacktools.unpack_fwtps_to_arrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
-
+        fwtps = dtpfeedbacktools.unpack_fwtps_to_nparrays(blk.as_capsule(), n_tpblocks, safe_mode = (i != 0))
         ts = min(fwtps['ts']) if i != n_samples else min(fwtps['ts'])
 
         ts_offsets.append((ts, offset))
@@ -169,15 +149,16 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('files_path', type=click.Path(exists=True))
 @click.option('-i', '--interactive', is_flag=True, default=False)
-@click.option('-m', '--map_id', type=click.Choice(
+@click.option('--save', is_flag=True, default=False)
+@click.option('-m', '--channel_map_name', type=click.Choice(
     [
-        "VDColdbox",
-        "HDColdbox",
-        "ProtoDUNESP1",
-        "PD2HD",
-        "VST"
+        "VDColdboxChannelMap",
+        "HDColdboxChannelMap",
+        "ProtoDUNESP1ChannelMap",
+        "PD2HDChannelMap",
+        "VSTChannelMap"
     ]),
-    help="Select input channel map", default="HDColdbox")
+    help="Select input channel map", default="HDColdboxChannelMap", show_default=True)
 @click.option('-f', '--frame_type', type=click.Choice(
     [
         "ProtoWIB",
@@ -186,34 +167,77 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     help="Select input frame type", default="WIB")
 @click.option('-o', '--outdir', type=click.Path(), default=".")
 @click.option('-s', '--split-factor', type=int, default=5)
+@click.option('--log_level', type=click.Choice(
+    [
+        "DEBUG",
+        "INFO",
+        "NOTSET"
+    ]), help="Select log level to output", default="INFO", show_default=True)
+@click.option('--log_out', is_flag=True,
+              help="Redirect log info to file", default=False, show_default=True)
 
-def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str, split_factor: int) -> None:
+def cli(files_path, interactive: bool, save: bool, channel_map_name: str, frame_type: str, outdir: str, split_factor: int, log_level: str, log_out: bool) -> None:
+    script = Path(__file__).stem
+    if log_out:
+        logging.basicConfig(
+            filename=f'log_{script}_{time.strftime("%Y%m%d")}_{time.strftime("%H%M%S")}.txt',
+            filemode="w",
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]"
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True)]
+        )
 
     capture_path = Path(files_path)
     outdir = Path(outdir)
     if not capture_path.is_dir():
         raise click.Abort("f{captuure_path} is not a directory")
 
-    rdm = RawDataManager(str(capture_path), frame_type, map_id)
+    rdm = RawDataManager(str(capture_path), frame_type, channel_map_name)
+    en_info = {'run_number': rdm.get_run()}
+    en_info = pd.DataFrame.from_dict(en_info, orient='index').T  #just a trick to save the info into the hdf5 files
     tp_files, adc_files = sorted(rdm.list_files(), reverse=True)
     
-    t = Table()
-    t.add_column("filename", style="green")
-    t.add_column("link #")
-    t.add_column("timestamp_min")
-    t.add_column("relative offset (timestamp ticks)")
-    t.add_column("capture length (timestamp ticks)")
-    t.add_column("capture length (s)")
-    t.add_column("overlap (s)")
-    
     captures = get_capture_details(rdm)
-
 
     for c in captures:
         find_boundaries(rdm, c)
 
         capture_print(c)
 
+        if not save:
+            continue
+
+        # Load TPs
+
+        # Calculate the list of ts/byte-offsets with large granularity
+        ts_offsets = scan_tp_ts_offsets(Path(rdm.data_path) / c.tp_file.name, 8192)
+
+        #
+        ts_offset_min = next(iter(i for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_min <  ts_offsets[i+1][0]), None)
+        ts_offset_max = next(iter(i+1 for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_max <  ts_offsets[i+1][0]), None)
+
+        # print(ts_offset_min, ts_offset_max)
+
+        rtp_df = rdm.load_tps(
+            c.tp_file.name,
+            n_tpblocks=(ts_offsets[ts_offset_max][1]-ts_offsets[ts_offset_min][1])//tp_block_bytes,
+            offset=ts_offsets[ts_offset_min][1]//tp_block_bytes, 
+        )
+
+        # trim
+        rtp_df = rtp_df[(rtp_df["ts"] > c.ts_overlap_min) & (rtp_df["ts"] < c.ts_overlap_max) ]
+
+        # Load ADCs
+        if c.ts_overlap_max is None or c.ts_overlap_min is None:
+            rich.print(f"Warning: no overlap detected for {c}. Skipping")
+            continue;
         radc_dfs = []
         for f in c.adc_files:
             df = rdm.load_tpcs(
@@ -226,25 +250,6 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
 
         radc_df = pd.concat(radc_dfs, axis=1)
 
-
-        # Calculate the list of ts/byte-offsets with large granularity
-        ts_offsets = scan_tp_ts_offsets(Path(rdm.data_path) / c.tp_file.name, 8192)
-
-        #
-        ts_offset_min = next(iter(i for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_min <  ts_offsets[i+1][0]), None)
-        ts_offset_max = next(iter(i+1 for i in range(len(ts_offsets)-1) if ts_offsets[i][0] <  c.ts_overlap_max <  ts_offsets[i+1][0]), None)
-
-        print(ts_offset_min, ts_offset_max)
-
-        rtp_df = rdm.load_tps(
-            c.tp_file.name,
-            n_tpblocks=(ts_offsets[ts_offset_max][1]-ts_offsets[ts_offset_min][1])//tp_block_bytes,
-            offset=ts_offsets[ts_offset_min][1]//tp_block_bytes, 
-        )
-
-        # trim
-        rtp_df = rtp_df[(rtp_df["ts"] > c.ts_overlap_min) & (rtp_df["ts"] < c.ts_overlap_max) ]
-
         # Calculate splitting intervals
         n_bins = split_factor
         ts_edges = [c.ts_overlap_min + x * (c.ts_overlap_max- c.ts_overlap_min) // n_bins for x in range(n_bins + 1)]
@@ -254,6 +259,8 @@ def cli(files_path, interactive: bool, map_id: str, frame_type: str, outdir: str
 
             print(f"File {i} - ts range ({ts_min}-{ts_max})")
             store = pd.HDFStore( outdir / (capture_path.name + f'_tp_link{c.tp_file.link_id}_file{i}.hdf5'))
+            print("Saving run info dataframe")
+            en_info.to_hdf(store, 'info')
             print("Saving raw tps dataframe")
             rtp_df[ (rtp_df['ts'] >= ts_min) & ( rtp_df['ts'] < ts_max) ].to_hdf(store, 'raw_fwtps')
             print("Saving raw adcs dataframe")

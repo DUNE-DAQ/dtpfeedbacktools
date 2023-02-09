@@ -1,7 +1,10 @@
-#ifndef DUNEDAQ_DTPFEEDBACKTOOLS_FWTP_HPP_
-#define DUNEDAQ_DTPFEEDBACKTOOLS_FWTP_HPP_
+#ifndef DUNEDAQ_DTPFEEDBACKTOOLS_INCLUDE_FWTP_HPP_
+#define DUNEDAQ_DTPFEEDBACKTOOLS_INCLUDE_FWTP_HPP_
 
 #include <stdint.h>
+#include <stddef.h>
+#include <vector>
+#include <stdexcept>
 
 namespace dunedaq
 {
@@ -80,4 +83,4 @@ namespace dunedaq
   } // namespace dtpfeedbacktools
 } // namespace dunedaq
 
-#endif /* DUNEDAQ_DTPFEEDBACKTOOLS_FWTP_HPP_ */
+#endif /* DUNEDAQ_DTPFEEDBACKTOOLS_INCLUDE_FWTP_HPP_ */
