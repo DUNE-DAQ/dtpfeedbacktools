@@ -3,6 +3,7 @@
 from dtpfeedbacktools.datamanager import DataManager
 import detchannelmaps
 import sys
+import warnings
 import rich
 import logging
 import time
@@ -290,20 +291,24 @@ def plotme_a_channel(tpc_df : pd.DataFrame, run : int, channel : int = 0, pdf : 
     # timestamp for the beginning of data capture that t will be plotted relative to
     t0 = tpc_df.index[0]
 
-    single_channel = tpc_df.iloc[:, channel] # get data from our signle channel
-    print(f"plotting channel: {channel}")
-    
-    with plt.style.context('bmh'): # lazy formatting
-        plt.plot(single_channel.index - t0, single_channel.to_numpy(), marker = "x", label = f"offline channel: {channel}")
-    plt.title(f"first timestamp: {t0}")
-    plt.xlabel("relative timestamp [tick]")
-    plt.ylabel("ADC")
-    plt.legend(title = f"run number: {run}")
-    plt.tight_layout()
+    try:
+        single_channel = tpc_df.iloc[:, channel] # get data from our signle channel
+        print(f"plotting channel: {channel}")
+        
+        with plt.style.context('bmh'): # lazy formatting
+            plt.plot(single_channel.index - t0, single_channel.to_numpy(), marker = "x", label = f"offline channel: {channel}")
+        plt.title(f"first timestamp: {t0}")
+        plt.xlabel("relative timestamp [tick]")
+        plt.ylabel("ADC")
+        plt.legend(title = f"run number: {run}")
+        plt.tight_layout()
 
-    if pdf: pdf.savefig()
-    plt.show()
-    plt.close()
+        if pdf: pdf.savefig()
+        plt.show()
+        plt.close()
+    except:
+        warnings.warn(f"channel {channel} was not found in the dataframe.")
+        pass
 
 
 def parse_number_list(numbers : str):
@@ -462,6 +467,8 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
         for c in channel:        
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
+
+    print(tp_df)
 
     if tr_flag and not tp_df.empty and tr_list != -1:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr[{tr_num}]_{dp.stem}.pdf'))
