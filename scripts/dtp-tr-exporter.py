@@ -98,11 +98,11 @@ def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_
     out_path = Path(out_path)
 
     if tr_num == "-1":
-        tr_str = ""
+        tr_str = "_exported"
     else:
         tr_str = tr_num
         tr_str = tr_str.replace(",", "-").replace(":", "_")
-        tr_str = f'_tr_{tr_str}'
+        tr_str = f'_exported_{tr_str}'
 
     tr_list = list(tr_num.split(','))
     tr_num = []
