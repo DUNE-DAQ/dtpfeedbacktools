@@ -201,6 +201,69 @@ def plotme_an_ADC_ED(df_adc, run, planeID, ntsamples, zeroped, pdf = None):
     plt.show()
     plt.close()
 
+#------------------------------------------------------------------------------
+def plotme_an_ADC_ED_by_plane(df_adc, start_index, planes, run, ntsamples, zeroped, show_gaps = True, pdf = None):
+
+    fig = plt.figure(figsize=(10,10))
+    gs = fig.add_gridspec(len(planes), 1, wspace=0.1)
+    axs = gs.subplots(sharex=True)
+
+    if show_gaps:
+        start_index = [0, 952, 1904, 3072]
+        n_rows = df_adc.shape[0]
+        missed_chans = np.setdiff1d(np.arange(start_index[0], start_index[-1], 1), df_adc.columns.values)
+        n_columns = len(missed_chans)
+        pad_df = pd.DataFrame(np.ones((n_rows, n_columns))*np.nan, columns=missed_chans)
+        pad_df.index = df_adc.index
+        new_df = pd.concat([df_adc, pad_df], axis=1)
+        df_adc = new_df.reindex(sorted(new_df.columns), axis=1)
+
+    norm = matplotlib.colors.LogNorm() # cmap for raw adc data
+    #create common norm
+    if zeroped:
+        Z = df_adc.to_numpy()[:,1:]
+        Z = Z - np.median(Z, axis = 0)
+        rms = np.nanmean(np.sqrt(np.mean(Z**2, axis = 0)))
+        #update cmap so it's centered at 0.
+        norm = matplotlib.colors.TwoSlopeNorm(vmin = -5 * rms, vcenter = 0, vmax = 5 * rms)
+
+    for i in planes:
+
+        #Prepare data for plotting 
+        df_plane = df_adc.iloc[:, start_index[i]:start_index[i + 1]]
+        df_plane = df_plane.loc[df_plane.index[ntsamples[0]]:df_plane.index[ntsamples[1]]]
+
+        # timestamp for the beginning of data capture that t will be plotted relative to
+        relative_ts = df_plane.index - df_plane.index[0]
+
+        Z = df_plane.to_numpy()[:,1:]
+
+        #quick cheated pedsub
+        if zeroped:
+            Z = Z - np.median(Z, axis = 0)
+
+        #2D plot of the raw ADC data
+        im = axs[i].imshow(Z.T, cmap = 'RdBu_r',aspect = 'auto', origin = 'lower', norm = norm,
+                extent = [ min(relative_ts),max(relative_ts), min(df_plane.columns), max(df_plane.columns) ] )
+        
+        axs[i].set_ylabel("Offline channel", fontsize=14, labelpad=10)
+        axs[i].tick_params(axis='both', which='major', labelsize=14)
+
+    axs[-1].set_xlabel("Relative time [fw tick]", fontsize=14, labelpad=10)
+    
+    axs[0].set_title(f"Run number: {run} | start timestamp: {df_adc.index[0]}", fontsize=16, pad=15)
+
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.87, 0.15, 0.025, 0.7])
+
+    cbar = matplotlib.colorbar.ColorbarBase(cbar_ax, cmap=matplotlib.cm.RdBu_r, norm=norm)
+    cbar_ax.set_ylabel(r"ADC", fontsize=16, labelpad=20, rotation=270)
+    cbar_ax.tick_params(axis='both', which='major', labelsize=12)
+
+    if pdf: pdf.savefig()
+    plt.show()
+    plt.close()
+
 
 #------------------------------------------------------------------------------
 def plotme_an_ED_v2(df_adc, df_tp, run, ntsamples, zeroped, pdf = None):
@@ -468,7 +531,15 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
             plotme_a_channel(tpc_df, run, c, pdf)
         pdf.close()
 
-    print(tp_df)
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_adc_evd_by_plane[{tr_num}]_{dp.stem}.pdf'))
+        
+        if channel_map_name == "VDColdboxChannelMap":
+            show_gaps = True
+        else:
+            show_gaps = False
+
+        plotme_an_ADC_ED_by_plane(tpc_df, start_index, planes, run, time_range, True, show_gaps = show_gaps, pdf = pdf)
+        pdf.close()
 
     if tr_flag and not tp_df.empty and tr_list != -1:
         pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / (f'TRDisplay_tp_tr[{tr_num}]_{dp.stem}.pdf'))
