@@ -417,7 +417,7 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
             if tr not in trl:
                 raise IndexError(f"{tr} does not exists!")
             try:
-                entries.append(rdm.load_entry(file_path, tr))
+                entries.append(rdm.load_entry(f, tr))
             except:
                 rich.print(f"Error when trying to open record {tr}!")
                 pass
