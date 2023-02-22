@@ -153,6 +153,7 @@ std::vector<FWTP> unpack_fwtps(void *buf, size_t n_blocks, bool safe_mode){
             tp_offset != 0
           ) {
             fmt::print("Found TP trailer at the wrong distance from previous one: {} delta={} (tp_offset={})\n", i, delta, tp_offset);
+            tp_offset = i+words_per_block-marker_offset;
             continue;
         }
 

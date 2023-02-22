@@ -171,7 +171,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     [
         "DEBUG",
         "INFO",
-        "NOTSET"
+        "CRITICAL"
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
