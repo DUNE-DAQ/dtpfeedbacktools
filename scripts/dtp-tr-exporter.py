@@ -17,31 +17,29 @@ from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.backends.backend_pdf
 
-def save_hdf5(en_info, adc_df, tp_df, fwtp_df, out_base_name):
+
+def save_hdf5(en_info, adc_df, tp_df, fwtp_df, out_base_name, tr_num):
     store = pd.HDFStore(out_base_name.with_suffix(".hdf5"))
-    print("Saving run info dataframe")
-    en_info.to_hdf(store, 'info')
-    print("Saving raw tps dataframe")
-    fwtp_df.to_hdf(store, 'raw_fwtps')
-    print("Saving adcs dataframe")
-    adc_df.to_hdf(store, 'raw_adcs')
-    print("Saving tp dataframe")
-    tp_df.to_hdf(store, 'tps')
+    head = f"record_{tr_num}/"
+    print(f"Saving record {tr_num}")
+    en_info.to_hdf(store, head + 'info')
+    fwtp_df.to_hdf(store, head + 'raw_fwtps')
+    adc_df.to_hdf(store, head + 'raw_adcs')
+    tp_df.to_hdf(store, head + 'tps')
+    
     store.close()
 
-def save_csv(en_info, adc_df, tp_df, fwtp_df, out_base_name):
+
+def save_csv(en_info, adc_df, tp_df, fwtp_df, out_base_name, tr_num):
     parent, name = out_base_name.parent, out_base_name.name
-    print("Saving run info dataframe")
-    en_info_name = name+"_info.csv"
+    head = f"_record_{tr_num}"
+    en_info_name = name + head + "_info.csv"
     en_info.to_csv(Path(parent).joinpath(en_info_name))
-    print("Saving raw tps dataframe")
-    fwtp_df_name = name+"_raw_fwtps.csv"
+    fwtp_df_name = name + head + "_raw_fwtps.csv"
     fwtp_df.to_csv(Path(parent).joinpath(fwtp_df_name))
-    print("Saving adcs dataframe")
-    adc_df_name = name+"_raw_adcs.csv"
+    adc_df_name = name + head + "_raw_adcs.csv"
     adc_df.to_csv(Path(parent).joinpath(adc_df_name))
-    print("Saving tp dataframe")
-    tp_df_name = name+"_tps.csv"
+    tp_df_name = name + head + "_tps.csv"
     tp_df.to_csv(Path(parent).joinpath(tp_df_name))
 
 out_method = {"HDF5": save_hdf5, "CSV": save_csv}
@@ -99,6 +97,13 @@ def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_
     dp = Path(file_path)
     out_path = Path(out_path)
 
+    if tr_num == "-1":
+        tr_str = ""
+    else:
+        tr_str = tr_num
+        tr_str = tr_str.replace(",", "-").replace(":", "_")
+        tr_str = f'_tr_{tr_str}'
+
     tr_list = list(tr_num.split(','))
     tr_num = []
     for tr in tr_list:
@@ -128,12 +133,10 @@ def cli(file_path: str, tr_num, interactive: bool, frame_type: str, channel_map_
         except:
             rich.print(f"Error when trying to open record {tr}!")
             pass
-    en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
-    if not fwtp_df.empty:
-        fwtp_df = fwtp_df.astype({'trigger_number': int})
 
-    out_base_name = out_path / (dp.stem + f'_tr_{tr_num}')
-    out_method[out_format](en_info, tpc_df, tp_df, fwtp_df, out_base_name)
+    out_base_name = out_path / (dp.stem + tr_str)
+    for i in range(len(entries)):
+        out_method[out_format](*entries[i], out_base_name, i)
     
     if interactive:
         import IPython
