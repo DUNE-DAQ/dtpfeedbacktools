@@ -123,8 +123,8 @@ def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
-@click.option('--hardware_map_file', type=click.Path(exists=True),
-              help="Select input hardware channel map")
+@click.option('--hardware_map_file',
+              help="Select input hardware channel map", default="")
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
 @click.option('-n', '--tr-num',
@@ -238,17 +238,19 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
     outpath = Path(outpath)
 
     if not fwtp_df.empty:
-        #Add link no to FWTP dataframe
-        # NOTE: this shouldn't be here, will move to datamanager eventually
-        hw_map = open_hw_map(hardware_map_file)
-        rich.print(hw_map)
-        fwtp_df['link_no'] = fwtp_df.apply(get_link, hw_map=hw_map, axis=1)
-        rich.print(fwtp_df)
+        if hardware_map_file != "":
+            #Add link no to FWTP dataframe
+            # NOTE: this shouldn't be here, will move to datamanager eventually
+            hw_map = open_hw_map(hardware_map_file)
+            rich.print(hw_map)
+            fwtp_df['link_no'] = fwtp_df.apply(get_link, hw_map=hw_map, axis=1)
+            rich.print(fwtp_df)
+            #Select bad TPs based on crate, slot, fiber
+            fwtp_bad_link = fwtp_df.loc[fwtp_df["link_no"] == -1]
 
-        fwtp_rates_plot(fwtp_df, dp, outpath)
+            fwtp_rates_plot(fwtp_df, dp, outpath)
 
-        #Select bad TPs based on crate, slot, fiber and tstamp info
-        fwtp_bad_link = fwtp_df.loc[fwtp_df["link_no"] == -1]
+        #Select bad TPs based on tstamp info
         fwtp_large_ts = fwtp_df.loc[fwtp_df["ts"] > 9e17]
         fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
 
@@ -257,7 +259,10 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
         fwtp_big_end_time   = fwtp_df.loc[fwtp_df["end_time"]   > 63]
         fwtp_big_peak_time  = fwtp_df.loc[fwtp_df["peak_time"]  > 63]
 
-        fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts, fwtp_big_start_time, fwtp_big_end_time, fwtp_big_peak_time]).drop_duplicates()
+        if hardware_map_file != "":
+            fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts, fwtp_big_start_time, fwtp_big_end_time, fwtp_big_peak_time]).drop_duplicates()
+        else:
+            fwtp_bad = pd.concat([fwtp_large_ts, fwtp_small_ts, fwtp_big_start_time, fwtp_big_end_time, fwtp_big_peak_time]).drop_duplicates()
         fwtp_good = pd.concat([fwtp_df, fwtp_bad]).drop_duplicates(keep=False)
         
         plt.rcParams.update({'font.size': 10})
