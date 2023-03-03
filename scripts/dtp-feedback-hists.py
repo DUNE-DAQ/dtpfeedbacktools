@@ -22,17 +22,24 @@ plt.style.use("ggplot")
 
 fir_shift = 15
 
-header_labels = {
+header_fwtp_labels = {
     'crate_no':("crate no", ""),
     'slot_no':("slot no", ""),
     'fiber_no':("fiber no", ""),
     'wire_no':("wire no", ""),
+    'hit_continue':("hit continue", ""),
     'start_time':("start time", " [ticks]"),
     'end_time':("end time", " [ticks]"),
     'peak_time':("peak time", " [ticks]"),
     'peak_adc':("peak adc", " [ADCs]"),
-    'hit_continue':("hit continue", ""),
-    'sum_adc':("sum adc", " [adc]")
+    'sum_adc':("sum adc", " [ADCs]")
+    }
+
+header_tp_labels = {
+    'offline_ch':("offline ch", ""),
+    'time_over_threshold':("time over threshold", " [tstamp ticks]"),
+    'sum_adc':("sum adc", " [ADC]"),
+    'peak_adc':("peak adc", " [ADC]")
     }
 
 CLK_FREQUENCY = 62.5e6
@@ -83,19 +90,24 @@ def fwtp_rates_plot(fwtp_df, dp, outpath):
     plt.savefig(outpath  / ('fwtp_rates_'+ dp.stem + '.pdf'))
 
 def hist_plot(fwtp_df, label_dict, run, tr_num, pdf=True):
+    n_hist = len(label_dict)
+    n_rows = int(np.ceil(n_hist/5))
+    n_cols = n_hist//n_rows
 
+    x_size = n_cols*5
+    y_size = n_rows*5
 
     plt.style.use('seaborn-v0_8-whitegrid')
-    fig, axs = plt.subplots(2,5, figsize=(20, 8)); axs = axs.ravel()
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(x_size, y_size)); axs = axs.ravel()
     fig.suptitle("run number: %.0f, trigger record : %.0f" %(run, tr_num), y = 0.99)
 
-    c = iter(plt.cm.jet(np.linspace(0, 1,len(header_labels))))
+    c = iter(plt.cm.jet(np.linspace(0, 1,len(label_dict))))
 
-    for n, var in enumerate(header_labels.keys()):
+    for n, var in enumerate(label_dict.keys()):
         fwtp_df[var].plot( kind = "hist", range = [min(fwtp_df[var]), max(fwtp_df[var])],
                            bins = 50, histtype = 'stepfilled', ax = axs[n],
                            color = next(c), edgecolor = 'k', alpha =0.8)
-        axs[n].set_xlabel(var)
+        axs[n].set_xlabel(label_dict[var][0]+label_dict[var][1])
         axs[n].set_axisbelow(True)
         #axs[n].set_yscale('log')
        
@@ -200,10 +212,10 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
                 pass
         en_info, tpc_df, tp_df, fwtp_df = map(pd.concat, zip(*entries))
 
-        #Throw exception if no FTPs in TR.
         if fwtp_df.empty:
-           raise Exception("No TPs found in the trigger record! Terminating script...")
-        fwtp_df = fwtp_df.astype({'trigger_number': int})
+           print("No TPs found in the trigger record! Terminating script...")
+        if not fwtp_df.empty:
+            fwtp_df = fwtp_df.astype({'trigger_number': int})
 
     elif input_type == "DF":
         key_list = get_key_list(file_path)
@@ -219,39 +231,59 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
 
     rich.print(en_info)
     rich.print(tpc_df)
-    rich.print(fwtp_df)
+    if not fwtp_df.empty:
+        rich.print(fwtp_df)
     if tr_flag: rich.print(tp_df)
 
     outpath = Path(outpath)
 
-    #Add link no to FWTP dataframe
-    # NOTE: this shouldn't be here, will move to datamanager eventually
-    hw_map = open_hw_map(hardware_map_file)
-    rich.print(hw_map)
-    fwtp_df['link_no'] = fwtp_df.apply(get_link, hw_map=hw_map, axis=1)
-    rich.print(fwtp_df)
+    if not fwtp_df.empty:
+        #Add link no to FWTP dataframe
+        # NOTE: this shouldn't be here, will move to datamanager eventually
+        hw_map = open_hw_map(hardware_map_file)
+        rich.print(hw_map)
+        fwtp_df['link_no'] = fwtp_df.apply(get_link, hw_map=hw_map, axis=1)
+        rich.print(fwtp_df)
 
-    fwtp_rates_plot(fwtp_df, dp, outpath)
+        fwtp_rates_plot(fwtp_df, dp, outpath)
 
-    #Select bad TPs based on crate, slot, fiber and tstamp info
-    fwtp_bad_link = fwtp_df.loc[fwtp_df["link_no"] == -1]
-    fwtp_large_ts = fwtp_df.loc[fwtp_df["ts"] > 9e17]
-    fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
+        #Select bad TPs based on crate, slot, fiber and tstamp info
+        fwtp_bad_link = fwtp_df.loc[fwtp_df["link_no"] == -1]
+        fwtp_large_ts = fwtp_df.loc[fwtp_df["ts"] > 9e17]
+        fwtp_small_ts = fwtp_df.loc[fwtp_df["ts"] < 1e17]
 
-    fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts]).drop_duplicates()
-    
-    plt.rcParams.update({'font.size': 10})
-    plt.rcParams['figure.dpi'] = 75
+        #Further bad TPs based on hit info
+        fwtp_big_start_time = fwtp_df.loc[fwtp_df["start_time"] > 63]
+        fwtp_big_end_time   = fwtp_df.loc[fwtp_df["end_time"]   > 63]
+        fwtp_big_peak_time  = fwtp_df.loc[fwtp_df["peak_time"]  > 63]
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
-    hist_plot(fwtp_df, header_labels, run, tr_num[0], pdf = pdf)    
-    pdf.close()
+        fwtp_bad = pd.concat([fwtp_bad_link, fwtp_large_ts, fwtp_small_ts, fwtp_big_start_time, fwtp_big_end_time, fwtp_big_peak_time]).drop_duplicates()
+        fwtp_good = pd.concat([fwtp_df, fwtp_bad]).drop_duplicates(keep=False)
+        
+        plt.rcParams.update({'font.size': 10})
+        plt.rcParams['figure.dpi'] = 75
 
-    if fwtp_bad.empty:
-        print('no "bad" firmware TPs were found.')
-    else:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
-        hist_plot(fwtp_bad, header_labels, run, tr_num[0], pdf = pdf)    
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_'+ dp.stem + '.pdf'))
+        hist_plot(fwtp_df, header_fwtp_labels, run, tr_num[0], pdf = pdf)    
+        pdf.close()
+
+        if fwtp_bad.empty:
+            print('no "bad" firmware TPs were found.')
+        else:
+            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_bad_'+ dp.stem + '.pdf'))
+            hist_plot(fwtp_bad, header_fwtp_labels, run, tr_num[0], pdf = pdf)    
+            pdf.close()
+
+        if fwtp_good.empty:
+            print('no "good" firmware TPs were found.')
+        else:
+            pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('fwtp_1d_hists_good_'+ dp.stem + '.pdf'))
+            hist_plot(fwtp_good, header_fwtp_labels, run, tr_num[0], pdf = pdf)    
+            pdf.close()
+
+    if not tp_df.empty:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(outpath  / ('tp_1d_hists_'+ dp.stem + '.pdf'))
+        hist_plot(tp_df, header_tp_labels, run, tr_num[0], pdf = pdf)    
         pdf.close()
 
     if interactive:
