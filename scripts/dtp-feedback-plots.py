@@ -393,8 +393,6 @@ def parse_number_list(numbers : str):
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('file_path', type=click.Path(exists=True))
-@click.option('--hardware_map_file', type=click.Path(exists=True),
-              help="Select input hardware channel map")
 @click.option('--input_type', type=click.Choice(["TR", "DF"]),
               help="Select input file type", default='TR', show_default=True)
 #@click.option('-n', '--tr-num', type=int,
@@ -432,7 +430,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
     ]), help="Select log level to output", default="INFO", show_default=True)
 @click.option('--log_out', is_flag=True,
               help="Redirect log info to file", default=False, show_default=True)
-def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, channel : str, time_range : str, outpath: str, log_level: str, log_out: bool) -> None:
+def cli(file_path: str, input_type: str, tr_num, interactive: bool, frame_type: str, channel_map_name: str, threshold: int, num_waves: int, step: int, channel : str, time_range : str, outpath: str, log_level: str, log_out: bool) -> None:
     script = Path(__file__).stem
     if log_out:
         logging.basicConfig(
@@ -449,10 +447,6 @@ def cli(file_path: str, hardware_map_file: str, input_type: str, tr_num, interac
             datefmt="[%X]",
             handlers=[RichHandler(rich_tracebacks=True)]
         )
-
-    print(f"{hardware_map_file=}")
-    # open_hw_map(hardware_map_file)
-     #return
 
     dp = Path(file_path)
     tr_flag = False
