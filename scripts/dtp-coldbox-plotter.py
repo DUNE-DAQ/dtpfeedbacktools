@@ -7,6 +7,7 @@ import h5py
 import numpy as np
 import argparse
 from dataclasses import dataclass
+
 from matplotlib import pyplot as plt
 
 # DAQ imports
@@ -16,8 +17,10 @@ import detdataformats.trigger_primitive
 
 @dataclass
 class TP:
-  m_channel: int
-  m_relative_time: int
+  m_channel:              int
+  m_relative_time:        int
+  m_time_over_threshold:  int
+  m_adc_integral:         int
 
 def GetRecordFromFile(_h5_file, _record):
   """
@@ -61,9 +64,9 @@ def GetTPs(_record, _max_tps):
   print(f'Number of fragments in your chosen trigger record: {len(fragments)}')
 
   # Initialize the list
-  tps = []
-  first = True 
-  time_shift = 0
+  tps         = []
+  first       = True 
+  time_shift  = 0
 
   # Iterate over all the fragments in the record
   for frag in fragments:
@@ -89,7 +92,7 @@ def GetTPs(_record, _max_tps):
       relative_time = (tp.time_start - time_shift) * 10.e-9
 
       # Fill the list of TP dataclass objects
-      tps.append(TP(tp.channel, relative_time))
+      tps.append(TP(tp.channel, relative_time, tp.time_over_threshold, tp.adc_integral))
 
       # Keep going if we want all the TPs
       if _max_tps == -1:
@@ -104,25 +107,131 @@ def GetTPs(_record, _max_tps):
   return tps
 
 def GetAttributeValues(_objects, _attribute):
-  return [getattr(obj, _attribute) for obj in _objects]
+  return np.array([getattr(obj, _attribute) for obj in _objects])
+
+def MakeOnePlot(_data, _labels='title;xaxis;yaxis', _output='data',
+                _plottype='hist', _min=-1, _max=-1):
+  """
+  Creates one plot given a detailed set of inputs. The plot can be either
+  scatter, 2D histogram or 1D histogram.
+
+  parameters:
+    _data: either numpy array for 1Dhist, or a list of numpy arrays (up to 3 for coloured scatter)
+    _labels: title;xaxis;yaxis labels string, the same format as root
+    _output: output name. "plot_" prefix and ".png" postfix will be added automatically
+    _plottype: type of plot. Either "hist", "hist2D" or "scatter"
+    _min: optional minimum x-axis value (only works for 1D hist).
+    _max: optional maximum x-axis value (only works for 1D hist).
+  """
+
+  print(f'Producing plot with the following data:\n  * output: {_output}\n  * plottype: {_plottype}\n  * labels: {_labels}\n')
+
+  # Create the figure
+  fplot = plt.figure()
+  aplot = fplot.add_subplot(111)
+
+  # Split the labels and set the title/axis labels
+  title, xaxis, yaxis = _labels.split(';',2)
+  aplot.set_xlabel(xaxis)
+  aplot.set_ylabel(yaxis)
+  aplot.set_title(title)
+
+  # Add a plot
+  if _plottype == 'hist':
+    # Unconstrained if default
+    if _min == -1:
+      _min = np.min(_data)
+    if _max == -1:
+      _max = np.max(_data)
+    aplot.hist(_data, _max - _min, (_min, _max))
+
+  elif _plottype == 'hist2D':
+    aplot.hist2d(_data[0], _data[1], bins=[100, 100])
+
+  elif _plottype == 'scatter':
+    if(len(_data) == 2):
+      # No colour scatter
+      aplot.scatter(_data[0], _data[1], s=2)
+    else:
+      # Colour scatter, added as an extra parameter
+      aplot.scatter(_data[0], _data[1], s=2, c=_data[2], cmap='coolwarm', vmax=np.max(_data[2])/20)
+
+  # Save the figure
+  fplot.savefig(f'plot_{_output}.png', dpi=300)
 
 def MakePlots(_tps):
   """
-  Plots the TPs...
-  TODO: Need to make the output configurable
+  Plots the TPs. It takes the list of TPs, converts them into numpy arrays, and
+  makes various plots using the MakeOnePlot function.
+
+  parameters:
+    _tps: list of TPs
   """
-  # Make the plot and set the labels
-  fig = plt.subplot(111)
-  fig.set_xlabel("Relative time (s)")
-  fig.set_ylabel("Channel ID")
 
-  # Create a scatter plot for relative time vs channel
-  fig.scatter(GetAttributeValues(_tps, 'm_relative_time'), GetAttributeValues(_tps, 'm_channel'),
-      marker='.',
-      )
+  # Extract the different TP parameter numpy arrays. Probably should have used
+  # with the numpy arrays rather than with this odd object to start with, so
+  # that's anothe TODO...
+  channelids    = GetAttributeValues(_tps, 'm_channel')
+  relative_time = GetAttributeValues(_tps, 'm_relative_time')
+  time_over_thr = GetAttributeValues(_tps, 'm_time_over_threshold')
+  adc_integral  = GetAttributeValues(_tps, 'm_adc_integral')
 
-  # TODO: Need to make the output configurable
-  plt.savefig('plot_tps_channel_vs_relativetime.png')
+  # 2D histogram of relative time vs channel id. Z axis -- TP intensity
+  MakeOnePlot([relative_time, channelids],
+               'TP heatmap of relative time(s) against channel ID;Channel ID;Relative time (s)',
+               'channel_vs_relativetime_heatmap',
+               'hist2D')
+
+  # 2D scatter of relative time vs channel id for each TP
+  MakeOnePlot([relative_time, channelids, adc_integral],
+               'TP scatter of relative time(s) against channel ID;Channel ID;Relative time (s)',
+               'channel_vs_relativetime_scatter',
+               'scatter')
+
+  # 1D hist of the TP intensity per channel ID
+  MakeOnePlot(channelids,
+              'TP frequency per Channel ID;Channel ID;Number of TPs in Channel ID',
+              'tps_per_channel_hist1D',
+              'hist')
+
+  # 1D hist of the TP intensity per time over threshold
+  MakeOnePlot(time_over_thr,
+              'TP frequency for time over threshold;Time over threshold;Number of TPs in time over threshold',
+              'tps_per_timeoverthreshold_hist1D',
+              'hist')
+
+  # 1D hist of the TP intensity per time over threshold, constrained between
+  # 0--1000
+  MakeOnePlot(time_over_thr,
+              'TP frequency for time over threshold (constrained);Time over threshold;Number of TPs in time over threshold',
+              'tps_per_timeoverthreshold_hist1D_constrained',
+              'hist', 0, 1000)
+
+  # 1D hist of the TP intensity per adc integral
+  MakeOnePlot(adc_integral,
+              'TP frequency per ADC Integral;ADC Integral;Number of TPs per ADC Integral bin',
+              'tps_per_adcintegral_hist1D',
+              'hist')
+
+  # 1D hist of the TP intensity per adc integral, constrained between 0--400
+  MakeOnePlot(adc_integral,
+              'TP frequency per ADC Integral (constrained);ADC Integral;Number of TPs per ADC Integral bin',
+              'tps_per_adcintegral_hist1D_constrained',
+              'hist', 0, 400)
+
+  # 2D histogram of the ADC Integral aginst Channel ID. Z axis -- TP intensity
+  MakeOnePlot([adc_integral, channelids],
+              'TP heatmap of ADC Integral vs Channel ID;ADC Integral;Channel ID',
+              'adcintegral_vs_channelid_heatmap',
+              'hist2D')
+
+  # 2D scatter of the ADC Integral vs vs channel id for each TP
+  MakeOnePlot([adc_integral, channelids],
+              'TP scatter of ADC Integral vs Channel ID;ADC Integral;Channel ID',
+              'adcintegral_vs_channelid_scatter',
+              'scatter')
+
+  plt.show()
 
 def main(_file, _record, _max_tps):
   print(_file)
@@ -146,4 +255,4 @@ if __name__ == "__main__":
   parser.add_argument('-m', '--max_tps', dest='max_tps', default=int(-1), help='Maxumum number of TPs to plot (default -1 == all tps)')
 
   args = parser.parse_args()
-  main(args.file, args.record, args.max_tps)
+  main(args.file, int(args.record), args.max_tps)
